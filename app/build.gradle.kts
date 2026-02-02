@@ -1,13 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "com.example.fitme"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.fitme"
@@ -46,6 +45,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.runtime)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -53,4 +54,17 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    // Navigation Compose
+    implementation(libs.androidx.navigation.compose)
+
+    // Room Database (Penyimpanan Lokal)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx) // Wajib untuk Coroutines
+    ksp(libs.androidx.room.compiler) //
+
+    // ViewModel & LiveData
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+    // Material Icons (Extended) untuk icon gym/run
+    implementation(libs.androidx.compose.material.icons.extended)
 }
