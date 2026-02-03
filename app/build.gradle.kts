@@ -63,8 +63,9 @@ dependencies {
     ksp(libs.androidx.room.compiler) //
 
     // ViewModel & LiveData
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose.v261)
 
     // Material Icons (Extended) untuk icon gym/run
     implementation(libs.androidx.compose.material.icons.extended)
+
 }
