@@ -13,16 +13,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.fitme.FrontEnd.DashboardScreen
-import com.example.fitme.FrontEnd.GymScreen
-import com.example.fitme.FrontEnd.Screen
+import com.example.fitme.database.AppDatabase
+import com.example.fitme.frontEnd.DashboardScreen
+import com.example.fitme.frontEnd.GymScreen
+import com.example.fitme.frontEnd.Screen
 import com.example.fitme.ui.theme.FitMeTheme
+import com.example.fitme.viewModel.FitMeViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +42,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainScreen() {
+    val context = LocalContext.current
+    val database = AppDatabase.getDatabase(context)
+    val dao = database.workoutDao()
+    val viewModelFactory = FitMeViewModel.Factory(dao)
+    val viewModel: FitMeViewModel = viewModel(factory = viewModelFactory)
+
     val navController = rememberNavController()
     val items = listOf(Screen.Home, Screen.Gym, Screen.Running, Screen.Profile)
 
@@ -64,8 +74,8 @@ fun MainScreen() {
         }
     ) { innerPadding ->
         NavHost(navController, startDestination = Screen.Home.route, Modifier.padding(innerPadding)) {
-            composable(Screen.Home.route) { DashboardScreen() }
-            composable(Screen.Gym.route) { GymScreen() }
+            composable(Screen.Home.route) { DashboardScreen(viewModel) }
+            composable(Screen.Gym.route) { GymScreen(viewModel) }
             composable(Screen.Running.route) { /* Running Screen */ }
             composable(Screen.Profile.route) { /* Profile Screen */ }
         }

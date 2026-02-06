@@ -1,4 +1,4 @@
-package com.example.fitme.FrontEnd
+package com.example.fitme.frontEnd
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
