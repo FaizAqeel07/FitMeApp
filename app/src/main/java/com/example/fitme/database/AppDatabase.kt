@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.fitme.DAO.WorkoutDao
 
-@Database(entities = [WorkoutLog::class], version = 1)
+@Database(entities = [WorkoutLog::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
 
@@ -20,7 +20,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "fitme_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration() // Menghapus data lama jika skema berubah
+                    .build()
                 INSTANCE = instance
                 instance
             }

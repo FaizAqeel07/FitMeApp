@@ -1,6 +1,7 @@
 package com.example.fitme.frontEnd
 
 import android.content.res.Configuration
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,11 +16,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -34,7 +38,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,12 +54,17 @@ import kotlinx.coroutines.launch
 fun GymScreen(viewModel: FitMeViewModel = viewModel()) {
     val logs by viewModel.allWorkouts.collectAsState()
     var showBottomSheet by rememberSaveable { mutableStateOf(false) }
+    var selectedWorkout by remember { mutableStateOf<WorkoutLog?>(null) }
+    
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { showBottomSheet = true }) {
+            FloatingActionButton(onClick = { 
+                selectedWorkout = null
+                showBottomSheet = true 
+            }) {
                 Icon(Icons.Default.Add, contentDescription = "Add Workout")
             }
         }
@@ -76,7 +87,10 @@ fun GymScreen(viewModel: FitMeViewModel = viewModel()) {
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(logs) { log ->
-                        WorkoutLogItem(log)
+                        WorkoutLogItem(log, onClick = {
+                            selectedWorkout = log
+                            showBottomSheet = true
+                        })
                     }
                 }
             }
@@ -84,16 +98,36 @@ fun GymScreen(viewModel: FitMeViewModel = viewModel()) {
 
         if (showBottomSheet) {
             ModalBottomSheet(
-                onDismissRequest = { showBottomSheet = false },
+                onDismissRequest = { 
+                    showBottomSheet = false
+                    selectedWorkout = null
+                },
                 sheetState = sheetState
             ) {
                 WorkoutInputForm(
+                    existingWorkout = selectedWorkout,
                     onSave = { name, weight, reps, sets ->
-                        viewModel.addWorkout(name, weight, reps, sets)
-                        scope.launch { sheetState.hide() }.invokeOnCompletion {
-                            if (!sheetState.isVisible) {
-                                showBottomSheet = false
-                            }
+                        val workout = selectedWorkout
+                        if (workout != null) {
+                            viewModel.updateWorkout(workout, name, weight, reps, sets)
+                        } else {
+                            viewModel.addWorkout(name, weight, reps, sets)
+                        }
+                        scope.launch { 
+                            sheetState.hide() 
+                            showBottomSheet = false
+                            selectedWorkout = null
+                        }
+                    },
+                    onDelete = {
+                        val workout = selectedWorkout
+                        if (workout != null) {
+                            viewModel.deleteWorkout(workout)
+                        }
+                        scope.launch { 
+                            sheetState.hide() 
+                            showBottomSheet = false
+                            selectedWorkout = null
                         }
                     }
                 )
@@ -103,9 +137,11 @@ fun GymScreen(viewModel: FitMeViewModel = viewModel()) {
 }
 
 @Composable
-fun WorkoutLogItem(log: WorkoutLog) {
+fun WorkoutLogItem(log: WorkoutLog, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(log.exerciseName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -120,11 +156,15 @@ fun WorkoutLogItem(log: WorkoutLog) {
 }
 
 @Composable
-fun WorkoutInputForm(onSave: (String, String, String, String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var weight by rememberSaveable { mutableStateOf("") }
-    var reps by rememberSaveable { mutableStateOf("") }
-    var sets by rememberSaveable { mutableStateOf("") }
+fun WorkoutInputForm(
+    existingWorkout: WorkoutLog? = null,
+    onSave: (String, String, String, String) -> Unit,
+    onDelete: () -> Unit = {}
+) {
+    var name by rememberSaveable { mutableStateOf(existingWorkout?.exerciseName ?: "") }
+    var weight by rememberSaveable { mutableStateOf(existingWorkout?.weight?.toString() ?: "") }
+    var reps by rememberSaveable { mutableStateOf(existingWorkout?.reps?.toString() ?: "") }
+    var sets by rememberSaveable { mutableStateOf(existingWorkout?.sets?.toString() ?: "") }
     
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -132,14 +172,29 @@ fun WorkoutInputForm(onSave: (String, String, String, String) -> Unit) {
     Column(
         Modifier
             .padding(16.dp)
-            .verticalScroll(rememberScrollState()) // Agar bisa discroll saat landscape + keyboard muncul
+            .verticalScroll(rememberScrollState())
             .padding(bottom = 32.dp)
     ) {
-        Text("Log New Workout", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                if (existingWorkout != null) "Edit Workout" else "Log New Workout",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            if (existingWorkout != null) {
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+                }
+            }
+        }
+        
         Spacer(modifier = Modifier.height(16.dp))
 
         if (isLandscape) {
-            // Layout Landscape: Name & Weight berdampingan
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = name,
@@ -155,7 +210,6 @@ fun WorkoutInputForm(onSave: (String, String, String, String) -> Unit) {
                 )
             }
         } else {
-            // Layout Portrait: Standar
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -183,7 +237,18 @@ fun WorkoutInputForm(onSave: (String, String, String, String) -> Unit) {
                 .fillMaxWidth()
                 .padding(top = 24.dp)
         ) {
-            Text("Save Workout")
+            Text(if (existingWorkout != null) "Update Workout" else "Save Workout")
+        }
+        
+        if (existingWorkout != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onDelete,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Delete Workout", color = Color.White)
+            }
         }
     }
 }

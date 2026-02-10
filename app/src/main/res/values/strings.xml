@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">FitMe</string>
+    <!-- Replace with your actual Web Client ID from Firebase Console / Google Cloud Console -->
+    <string name="default_web_client_id">621078401507-h0h0bpcq125hbn4asqr89098d6f8tbpn.apps.googleusercontent.com</string>
 </resources>

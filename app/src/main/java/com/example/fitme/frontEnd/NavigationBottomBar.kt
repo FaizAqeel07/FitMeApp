@@ -7,7 +7,9 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.graphics.vector.ImageVector
 
-sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
+sealed class Screen(val route: String, val title: String = "", val icon: ImageVector? = null) {
+    object Login : Screen("login")
+    object Register : Screen("register")
     object Home : Screen("home", "Home", Icons.Default.Home)
     object Gym : Screen("gym", "Gym", Icons.Default.FitnessCenter)
     object Running : Screen("running", "Run", Icons.AutoMirrored.Filled.DirectionsRun)

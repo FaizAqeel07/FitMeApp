@@ -1,13 +1,10 @@
 package com.example.fitme.viewModel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.fitme.DAO.WorkoutDao
-import com.example.fitme.database.AppDatabase
 import com.example.fitme.database.WorkoutLog
+import com.example.fitme.repositoryViewModel.WorkoutRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,18 +23,24 @@ data class DashboardState(
     val elevation: Int = 120
 )
 
-class FitMeViewModel(private val dao: WorkoutDao) : ViewModel() {
+class FitMeViewModel(private val repository: WorkoutRepository) : ViewModel() {
     private val _uiState = kotlinx.coroutines.flow.MutableStateFlow(DashboardState())
     val uiState = _uiState.asStateFlow()
 
-    // State untuk Dashboard (diambil dari database)
-    val allWorkouts: StateFlow<List<WorkoutLog>> = dao.getAllWorkouts().stateIn(
+    // State untuk Dashboard (diambil dari repository yang menggabungkan Lokal + Cloud)
+    val allWorkouts: StateFlow<List<WorkoutLog>> = repository.getAllWorkoutsLocal().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
 
-    // Fungsi untuk menambah data dari Gym Screen
+    fun syncWorkouts() {
+        viewModelScope.launch {
+            repository.syncFromCloud()
+        }
+    }
+
+    // Fungsi untuk menambah data
     fun addWorkout(name: String, weight: String, reps: String, sets: String) {
         val w = weight.toDoubleOrNull() ?: 0.0
         val r = reps.toIntOrNull() ?: 0
@@ -49,17 +52,42 @@ class FitMeViewModel(private val dao: WorkoutDao) : ViewModel() {
                 weight = w,
                 reps = r,
                 sets = s,
-                volume = w * r * s // Rumus volume
+                volume = w * r * s
             )
-            dao.insertWorkout(newWorkout)
+            repository.insertWorkout(newWorkout)
         }
     }
 
-    class Factory(private val dao: WorkoutDao) : ViewModelProvider.Factory {
+    // Fungsi untuk memperbarui data
+    fun updateWorkout(workout: WorkoutLog, name: String, weight: String, reps: String, sets: String) {
+        val w = weight.toDoubleOrNull() ?: 0.0
+        val r = reps.toIntOrNull() ?: 0
+        val s = sets.toIntOrNull() ?: 0
+
+        viewModelScope.launch {
+            val updatedWorkout = workout.copy(
+                exerciseName = name,
+                weight = w,
+                reps = r,
+                sets = s,
+                volume = w * r * s
+            )
+            repository.updateWorkout(updatedWorkout)
+        }
+    }
+
+    // Fungsi untuk menghapus data
+    fun deleteWorkout(workout: WorkoutLog) {
+        viewModelScope.launch {
+            repository.deleteWorkout(workout)
+        }
+    }
+
+    class Factory(private val repository: WorkoutRepository) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(FitMeViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return FitMeViewModel(dao) as T
+                return FitMeViewModel(repository) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }
