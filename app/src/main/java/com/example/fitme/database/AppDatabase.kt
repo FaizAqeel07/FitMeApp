@@ -8,7 +8,7 @@ import com.example.fitme.DAO.GymDao
 import com.example.fitme.DAO.RecommendationDao
 import com.example.fitme.DAO.WorkoutDao
 
-@Database(entities = [WorkoutLog::class, Recommendation::class, Gym::class], version = 4, exportSchema = false)
+@Database(entities = [WorkoutLog::class, Recommendation::class, Gym::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
     abstract fun recommendationDao(): RecommendationDao

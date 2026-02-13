@@ -22,6 +22,7 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.fitme.database.AppDatabase
 import com.example.fitme.frontEnd.*
+import com.example.fitme.repositoryViewModel.RecommendationRepository
 import com.example.fitme.repositoryViewModel.WorkoutRepository
 import com.example.fitme.ui.theme.FitMeTheme
 import com.example.fitme.viewModel.*
@@ -42,12 +43,17 @@ class MainActivity : ComponentActivity() {
 fun MainScreen() {
     val context = LocalContext.current
     val database = AppDatabase.getDatabase(context)
-    val dao = database.workoutDao()
+    val workoutDao = database.workoutDao()
+    val recommendationDao = database.recommendationDao()
     
-    val repository = WorkoutRepository(dao)
+    val workoutRepository = WorkoutRepository(workoutDao)
+    val recommendationRepository = RecommendationRepository(recommendationDao)
+    
     val authViewModel: AuthViewModel = viewModel()
-    val viewModelFactory = FitMeViewModelFactory(repository)
+    val viewModelFactory = FitMeViewModelFactory(workoutRepository, recommendationRepository)
+    
     val viewModel: FitMeViewModel = viewModel(factory = viewModelFactory)
+    val recViewModel: RecommendationViewModel = viewModel(factory = viewModelFactory)
 
     val navController = rememberNavController()
     val currentUser by authViewModel.currentUser.collectAsState()
@@ -71,8 +77,6 @@ fun MainScreen() {
                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                             onClick = {
                                 navController.navigate(screen.route) {
-                                    // Professional Navigation: Pop up to the start destination of the graph to
-                                    // avoid building up a large stack of destinations
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
                                     }
@@ -85,7 +89,7 @@ fun MainScreen() {
                 }
             }
         },
-        contentWindowInsets = WindowInsets.navigationBars // Menangani padding sistem secara otomatis
+        contentWindowInsets = WindowInsets.navigationBars
     ) { innerPadding ->
         NavHost(
             navController = navController,
@@ -128,6 +132,7 @@ fun MainScreen() {
             composable(Screen.Home.route) { 
                 DashboardScreen(
                     viewModel = viewModel,
+                    recViewModel = recViewModel,
                     onNavigateToDetail = { recId ->
                         navController.navigate(Screen.RecommendationDetail.createRoute(recId))
                     }
@@ -143,7 +148,6 @@ fun MainScreen() {
                     recId = recId,
                     onBack = { navController.popBackStack() },
                     onStartWorkout = { _ ->
-                        // PROFESSIONAL FIX: Navigate with clearing the detail from stack
                         navController.navigate(Screen.Gym.route) {
                             popUpTo(Screen.Home.route) {
                                 saveState = true

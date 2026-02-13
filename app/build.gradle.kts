@@ -19,7 +19,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
         // RapidAPI Keys
-        buildConfigField("String", "RAPIDAPI_KEY", "\"${project.findProperty("RAPID_API_KEY") ?: "e7fc2e5d9dmsha3ea2cf98bc2301p1d6c3fjsnc8420a7ae03c"}\"")
+        buildConfigField("String", "RAPIDAPI_KEY", "\"e7fc2e5d9dmsha3ea2cf98bc2301p1d6c3fjsnc8420a7ae03c\"")
         buildConfigField("String", "RAPIDAPI_HOST", "\"edb-with-videos-and-images-by-ascendapi.p.rapidapi.com\"")
     }
 

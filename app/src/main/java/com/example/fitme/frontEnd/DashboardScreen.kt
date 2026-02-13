@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -30,12 +31,13 @@ import com.example.fitme.viewModel.RecommendationViewModel
 
 @Composable
 fun DashboardScreen(
-    viewModel: FitMeViewModel = viewModel(),
-    recViewModel: RecommendationViewModel = viewModel(),
+    viewModel: FitMeViewModel,
+    recViewModel: RecommendationViewModel,
     onNavigateToDetail: (String) -> Unit
 ) {
     val logs by viewModel.allWorkouts.collectAsState()
-    val recommendations by recViewModel.allRecommendations.collectAsState(initial = emptyList())
+    val recommendations by recViewModel.recommendations.collectAsState()
+    val isLoading by recViewModel.isLoading.collectAsState()
     
     val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     val greeting = when(hour) {
@@ -84,19 +86,37 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        if (recommendations.isNotEmpty()) {
-            item {
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     "Recommended for you", 
                     style = MaterialTheme.typography.titleMedium, 
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
             }
-
-            items(recommendations) { workout ->
-                RecommendedWorkoutCard(workout = workout) { 
-                    onNavigateToDetail(workout.id)
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            if (recommendations.isEmpty() && !isLoading) {
+                Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                    Text("No recommendations found.")
+                }
+            } else {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
+                ) {
+                    items(recommendations) { workout ->
+                        RecommendedWorkoutCard(workout = workout) { 
+                            onNavigateToDetail(workout.id)
+                        }
+                    }
                 }
             }
         }
@@ -128,45 +148,46 @@ fun RecommendedWorkoutCard(workout: Recommendation, onClick: () -> Unit) {
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
+            .width(280.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .padding(12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxWidth()
         ) {
-            // Gambar/GIF Preview
             AsyncImage(
                 model = workout.gifUrl,
                 contentDescription = workout.title,
                 imageLoader = imageLoader,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(80.dp)
+                    .fillMaxWidth()
+                    .height(150.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             )
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(workout.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = "${workout.category} • ${workout.level}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = workout.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                workout.title, 
+                fontWeight = FontWeight.Bold, 
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1
+            )
+            Text(
+                text = "${workout.category} • ${workout.target}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "Equipment: ${workout.equipment}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

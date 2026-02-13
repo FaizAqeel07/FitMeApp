@@ -5,10 +5,12 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "recommendations")
 data class Recommendation(
-    @PrimaryKey val id: String, // Menggunakan String agar sesuai dengan ID dari RapidAPI
+    @PrimaryKey val id: String,
     val title: String,
     val description: String,
     val gifUrl: String,
-    val level: String, // "Beginner", "Intermediate", "Advanced"
-    val category: String // "Strength", "Cardio", "Flexibility"
+    val level: String,
+    val category: String,
+    val target: String,
+    val equipment: String
 )

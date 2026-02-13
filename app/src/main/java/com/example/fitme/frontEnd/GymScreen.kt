@@ -5,8 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.fitme.database.WorkoutLog
-import com.example.fitme.network.Exercise
+import com.example.fitme.network.ExerciseResponse
 import com.example.fitme.viewModel.FitMeViewModel
 import kotlinx.coroutines.launch
 
@@ -181,7 +181,7 @@ fun GymScreen(viewModel: FitMeViewModel = viewModel()) {
 }
 
 @Composable
-fun ApiExerciseItem(exercise: Exercise, onClick: () -> Unit) {
+fun ApiExerciseItem(exercise: ExerciseResponse, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))

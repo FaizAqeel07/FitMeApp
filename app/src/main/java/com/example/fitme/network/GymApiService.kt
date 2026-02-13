@@ -6,63 +6,56 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Path
 import retrofit2.http.Query
-
-// Model Data Otot
-data class Muscle(
-    val id: String,
-    val name: String
-)
-
-// Model Data Latihan (Exercise)
-data class Exercise(
-    val id: String,
-    val name: String,
-    val instructions: List<String>?,
-    val gifUrl: String?,
-    val muscleId: String?,
-    val equipment: String?,
-    val difficulty: String?,
-    val bodyPart: String?,
-    val type: String?
-)
 
 interface GymApiService {
 
-    @GET("api/v1/muscles")
+    @GET("muscles")
     suspend fun getMuscles(
-        @Header("x-rapidapi-key") apiKey: String = BuildConfig.RAPIDAPI_KEY,
-        @Header("x-rapidapi-host") host: String = BuildConfig.RAPIDAPI_HOST
+        @Header("x-rapidapi-key") apiKey: String = "e7fc2e5d9dmsha3ea2cf98bc2301p1d6c3fjsnc8420a7ae03c",
+        @Header("x-rapidapi-host") host: String = "edb-with-videos-and-images-by-ascendapi.p.rapidapi.com"
     ): Response<List<Muscle>>
 
-    @GET("api/v1/bodyparts")
+    @GET("bodyparts")
     suspend fun getBodyParts(
-        @Header("x-rapidapi-key") apiKey: String = BuildConfig.RAPIDAPI_KEY,
-        @Header("x-rapidapi-host") host: String = BuildConfig.RAPIDAPI_HOST
+        @Header("x-rapidapi-key") apiKey: String = "e7fc2e5d9dmsha3ea2cf98bc2301p1d6c3fjsnc8420a7ae03c",
+        @Header("x-rapidapi-host") host: String = "edb-with-videos-and-images-by-ascendapi.p.rapidapi.com"
     ): Response<List<String>>
 
-    @GET("api/v1/equipments")
+    @GET("equipments")
     suspend fun getEquipments(
-        @Header("x-rapidapi-key") apiKey: String = BuildConfig.RAPIDAPI_KEY,
-        @Header("x-rapidapi-host") host: String = BuildConfig.RAPIDAPI_HOST
+        @Header("x-rapidapi-key") apiKey: String = "e7fc2e5d9dmsha3ea2cf98bc2301p1d6c3fjsnc8420a7ae03c",
+        @Header("x-rapidapi-host") host: String = "edb-with-videos-and-images-by-ascendapi.p.rapidapi.com"
     ): Response<List<String>>
 
-    @GET("api/v1/exercisetypes")
-    suspend fun getExerciseTypes(
-        @Header("x-rapidapi-key") apiKey: String = BuildConfig.RAPIDAPI_KEY,
-        @Header("x-rapidapi-host") host: String = BuildConfig.RAPIDAPI_HOST
-    ): Response<List<String>>
-
-    @GET("api/v1/exercises")
+    @GET("exercises")
     suspend fun getExercises(
-        @Query("name") name: String? = null,
-        @Query("keywords") keywords: String? = null,
-        @Header("x-rapidapi-key") apiKey: String = BuildConfig.RAPIDAPI_KEY,
-        @Header("x-rapidapi-host") host: String = BuildConfig.RAPIDAPI_HOST
-    ): Response<List<Exercise>>
+        @Query("bodyPart") bodyPart: String? = null,
+        @Query("equipment") equipment: String? = null,
+        @Query("limit") limit: Int = 10,
+        @Header("x-rapidapi-key") apiKey: String = "e7fc2e5d9dmsha3ea2cf98bc2301p1d6c3fjsnc8420a7ae03c",
+        @Header("x-rapidapi-host") host: String = "edb-with-videos-and-images-by-ascendapi.p.rapidapi.com"
+    ): Response<List<ExerciseResponse>>
+
+    @GET("exercises/search")
+    suspend fun searchExercises(
+        @Query("search") query: String,
+        @Query("limit") limit: Int = 20,
+        @Header("x-rapidapi-key") apiKey: String = "f0c3921a0bmsh17a2e807230aa4bp1b0615jsnf80da4067bf0",
+        @Header("x-rapidapi-host") host: String = "edb-with-videos-and-images-by-ascendapi.p.rapidapi.com"
+    ): Response<List<ExerciseResponse>>
+
+    @GET("exercises/{id}")
+    suspend fun getExerciseById(
+        @Path("id") id: String,
+        @Header("x-rapidapi-key") apiKey: String = "e7fc2e5d9dmsha3ea2cf98bc2301p1d6c3fjsnc8420a7ae03c",
+        @Header("x-rapidapi-host") host: String = "edb-with-videos-and-images-by-ascendapi.p.rapidapi.com"
+    ): Response<ExerciseResponse>
 
     companion object {
-        private const val BASE_URL = "https://edb-with-videos-and-images-by-ascendapi.p.rapidapi.com/"
+        // Perbaikan BASE_URL sesuai contoh (tambah api/v1/)
+        private const val BASE_URL = "https://edb-with-videos-and-images-by-ascendapi.p.rapidapi.com/api/v1/"
 
         fun create(): GymApiService {
             return Retrofit.Builder()

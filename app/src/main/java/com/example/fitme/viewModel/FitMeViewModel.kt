@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.fitme.database.WorkoutLog
-import com.example.fitme.network.Exercise
+import com.example.fitme.network.ExerciseResponse
 import com.example.fitme.network.GymApiService
 import com.example.fitme.repositoryViewModel.WorkoutRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,7 +28,7 @@ class FitMeViewModel(private val repository: WorkoutRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(DashboardState())
     val uiState = _uiState.asStateFlow()
 
-    private val _searchResults = MutableStateFlow<List<Exercise>>(emptyList())
+    private val _searchResults = MutableStateFlow<List<ExerciseResponse>>(emptyList())
     val searchResults = _searchResults.asStateFlow()
 
     private val _isSearching = MutableStateFlow(false)
@@ -49,8 +49,8 @@ class FitMeViewModel(private val repository: WorkoutRepository) : ViewModel() {
         _isSearching.value = true
         viewModelScope.launch {
             try {
-                // Menggunakan getExercises dari AscendAPI
-                val response = apiService.getExercises(name = query)
+                // Menggunakan endpoint searchExercises yang baru
+                val response = apiService.searchExercises(query = query, limit = 20)
                 if (response.isSuccessful) {
                     _searchResults.value = response.body() ?: emptyList()
                 } else {

@@ -1,58 +1,57 @@
 package com.example.fitme.viewModel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.fitme.database.AppDatabase
 import com.example.fitme.database.Recommendation
-import com.example.fitme.database.WorkoutLog
 import com.example.fitme.repositoryViewModel.RecommendationRepository
-import com.example.fitme.repositoryViewModel.WorkoutRepository
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class RecommendationViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: RecommendationRepository
-    private val workoutRepository: WorkoutRepository
-    val allRecommendations: Flow<List<Recommendation>>
+class RecommendationViewModel(private val repository: RecommendationRepository) : ViewModel() {
+
+    val recommendations: StateFlow<List<Recommendation>> = repository.allRecommendations.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _selectedRecommendation = MutableStateFlow<Recommendation?>(null)
-    val selectedRecommendation: StateFlow<Recommendation?> = _selectedRecommendation
+    val selectedRecommendation: StateFlow<Recommendation?> = _selectedRecommendation.asStateFlow()
 
     init {
-        val database = AppDatabase.getDatabase(application)
-        val dao = database.recommendationDao()
-        repository = RecommendationRepository(dao)
-        workoutRepository = WorkoutRepository(database.workoutDao())
-        allRecommendations = repository.getAllRecommendations()
-        refresh()
+        refreshRecommendations()
     }
 
-    fun refresh() {
+    fun refreshRecommendations() {
         viewModelScope.launch {
-            repository.refreshRecommendations()
+            _isLoading.value = true
+            repository.fetchAndSaveRecommendations()
+            _isLoading.value = false
         }
     }
 
     fun getRecommendationById(id: String) {
         viewModelScope.launch {
-            _selectedRecommendation.value = repository.getRecommendationById(id)
+            val found = repository.getRecommendationById(id)
+            _selectedRecommendation.value = found
         }
     }
 
-    fun startWorkout(title: String) {
-        viewModelScope.launch {
-            val newWorkout = WorkoutLog(
-                exerciseName = title,
-                weight = 0.0,
-                reps = 0,
-                sets = 0,
-                volume = 0.0,
-                date = System.currentTimeMillis()
-            )
-            workoutRepository.insertWorkout(newWorkout)
+    class Factory(private val repository: RecommendationRepository) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(RecommendationViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return RecommendationViewModel(repository) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
 }

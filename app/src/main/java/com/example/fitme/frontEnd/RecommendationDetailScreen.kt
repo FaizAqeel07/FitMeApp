@@ -177,7 +177,6 @@ fun RecommendationDetailScreen(
 
                     Button(
                         onClick = { 
-                            viewModel.startWorkout(rec.title)
                             onStartWorkout(rec.title) 
                         },
                         modifier = Modifier
