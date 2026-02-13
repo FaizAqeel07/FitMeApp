@@ -2,108 +2,107 @@ package com.example.fitme.repositoryViewModel
 
 import android.util.Log
 import com.example.fitme.DAO.RecommendationDao
+import com.example.fitme.DAO.WorkoutDao
 import com.example.fitme.database.Recommendation
+import com.example.fitme.database.WorkoutLog
 import com.example.fitme.network.ExerciseResponse
 import com.example.fitme.network.GymApiService
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
-import retrofit2.Response
+import kotlinx.coroutines.withContext
 
-class RecommendationRepository(private val dao: RecommendationDao) {
+class RecommendationRepository(
+    private val recommendationDao: RecommendationDao,
+    private val workoutDao: WorkoutDao
+) {
     private val apiService = GymApiService.create()
-    private val firebaseDatabase = FirebaseDatabase.getInstance("https://fitme-87a12-default-rtdb.asia-southeast1.firebasedatabase.app")
-    private val recommendationRef = firebaseDatabase.getReference("recommendations")
+    private val auth = FirebaseAuth.getInstance()
+    private val database = FirebaseDatabase.getInstance("https://fitme-87a12-default-rtdb.asia-southeast1.firebasedatabase.app")
 
-    val allRecommendations: Flow<List<Recommendation>> = dao.getAllRecommendations()
+    val allRecommendations: Flow<List<Recommendation>> = recommendationDao.getAllRecommendations()
 
     suspend fun fetchAndSaveRecommendations() {
         try {
-            Log.d("RecommendationRepository", "Fetching recommendations from Firebase...")
-            val snapshot = recommendationRef.get().await()
-            val remoteList = mutableListOf<Recommendation>()
-
-            snapshot.children.forEach { child ->
-                val rec = child.getValue(Recommendation::class.java)
-                if (rec != null) {
-                    remoteList.add(rec)
-                }
-            }
-
-            if (remoteList.isNotEmpty()) {
-                Log.d("RecommendationRepository", "Sync from Firebase Success: ${remoteList.size} items")
-                dao.clearAll()
-                dao.insertAll(remoteList)
-                return
-            }
-
-            // Jika Firebase Kosong, baru coba API
-            fetchFromApi()
-        } catch (e: Exception) {
-            Log.e("RecommendationRepository", "Firebase Sync Failed: ${e.message}", e)
-            fetchFromApi()
-        }
-    }
-
-    private suspend fun fetchFromApi() {
-        try {
-            Log.d("RecommendationRepository", "Fetching recommendations from API fallback...")
-            val response = apiService.getExercises(limit = 20)
+            val response = apiService.getExercises(limit = 100)
             if (response.isSuccessful) {
-                val exercises = response.body() ?: emptyList()
-                if (exercises.isNotEmpty()) {
-                    val recommendations = exercises.map { it.toEntity() }
-                    dao.clearAll()
-                    dao.insertAll(recommendations)
-                    return
+                val exercises = response.body()?.data ?: emptyList()
+                val recommendations = exercises.mapNotNull { it.toEntity() }
+                if (recommendations.isNotEmpty()) {
+                    recommendationDao.clearAll()
+                    recommendationDao.insertAll(recommendations)
+                    Log.d("FitMe_Debug", "Room Updated with ${recommendations.size} items")
                 }
             }
-            seedDefaultRecommendations()
         } catch (e: Exception) {
-            Log.e("RecommendationRepository", "API Fallback Failed", e)
-            seedDefaultRecommendations()
+            Log.e("FitMe_Debug", "Fetch Error: ${e.message}")
         }
     }
-    
-    private suspend fun seedDefaultRecommendations() {
-        val defaults = listOf(
-            Recommendation(
-                id = "1",
-                title = "Push Ups",
-                description = "Place your hands on the floor, slightly wider than shoulder-width. Lower your body until your chest almost touches the floor.",
-                gifUrl = "https://media.giphy.com/media/3o7TKMGpxVfFKTvT6o/giphy.gif",
-                level = "Beginner",
-                category = "Chest",
-                target = "Pectorals",
-                equipment = "Body weight"
-            ),
-            Recommendation(
-                id = "2",
-                title = "Bodyweight Squat",
-                description = "Stand with feet shoulder-width apart. Lower your hips back and down until your thighs are parallel to the floor.",
-                gifUrl = "https://media.giphy.com/media/l2R08b4nK2L1jW3S0/giphy.gif",
-                level = "Beginner",
-                category = "Legs",
-                target = "Quads",
-                equipment = "Body weight"
-            )
+
+    suspend fun getRandomRecommendations(): List<Recommendation> = withContext(Dispatchers.IO) {
+        try {
+            Log.d("FitMe_Debug", "Starting getRandomRecommendations...")
+            
+            val bodyPartsResponse = apiService.getBodyParts()
+            var categories: List<String>? = null
+            
+            if (bodyPartsResponse.isSuccessful) {
+                categories = bodyPartsResponse.body()?.data?.mapNotNull { it.name }
+            }
+            
+            val randomCategory = categories?.randomOrNull()
+            Log.d("FitMe_Debug", "Fetching for category: $randomCategory")
+
+            val response = apiService.getExercises(bodyPart = randomCategory, limit = 15)
+            if (response.isSuccessful) {
+                val exercises = response.body()?.data ?: emptyList()
+                val mapped = exercises.mapNotNull { it.toEntity() }
+                Log.d("FitMe_Debug", "Successfully mapped ${mapped.size} items for Dashboard")
+                return@withContext mapped
+            }
+            
+            emptyList()
+        } catch (e: Exception) {
+            Log.e("FitMe_Debug", "Random Recommendations Exception: ${e.message}")
+            emptyList()
+        }
+    }
+
+    suspend fun saveExerciseToFirebase(title: String) {
+        val uid = auth.currentUser?.uid ?: return
+        val historyRef = database.getReference("users").child(uid).child("recommendation_history").push()
+        historyRef.setValue(mapOf("exerciseName" to title, "timestamp" to System.currentTimeMillis())).await()
+    }
+
+    suspend fun addExerciseToHistory(recommendation: Recommendation) {
+        val uid = auth.currentUser?.uid
+        val workoutLog = WorkoutLog(
+            exerciseName = recommendation.title,
+            date = System.currentTimeMillis()
         )
-        dao.insertAll(defaults)
-        Log.d("RecommendationRepository", "Seeded hardcoded defaults")
+        workoutDao.insertWorkout(workoutLog)
+        if (uid != null) {
+            database.getReference("users").child(uid).child("workouts").push().setValue(workoutLog).await()
+        }
     }
 
-    suspend fun getRecommendationById(id: String): Recommendation? {
-        return dao.getRecommendationById(id)
-    }
+    suspend fun getRecommendationById(id: String): Recommendation? = recommendationDao.getRecommendationById(id)
 
-    private fun ExerciseResponse.toEntity() = Recommendation(
-        id = id,
-        title = name.replaceFirstChar { it.uppercase() },
-        description = instructions?.joinToString("\n") ?: "No instructions available",
-        gifUrl = gifUrl ?: "",
-        level = difficulty?.replaceFirstChar { it.uppercase() } ?: "Intermediate",
-        category = bodyPart?.replaceFirstChar { it.uppercase() } ?: "Strength",
-        target = target?.replaceFirstChar { it.uppercase() } ?: "General",
-        equipment = equipment?.replaceFirstChar { it.uppercase() } ?: "Body weight"
-    )
+    private fun ExerciseResponse.toEntity(): Recommendation? {
+        // AUDIT FIX: Jangan skip kalau ID null. Gunakan Nama sebagai ID cadangan (Fallback)
+        val safeId = id ?: name?.replace(" ", "_")?.lowercase() ?: return null
+        
+        return Recommendation(
+            id = safeId,
+            title = name?.replaceFirstChar { it.uppercase() } ?: "Unknown",
+            description = instructions?.joinToString("\n") ?: "No instructions",
+            gifUrl = imageUrl ?: videoUrl ?: "",
+            level = difficulty?.replaceFirstChar { it.uppercase() } ?: "Intermediate",
+            category = bodyPart?.replaceFirstChar { it.uppercase() } ?: "General",
+            target = target?.replaceFirstChar { it.uppercase() } ?: "General",
+            equipment = equipment?.replaceFirstChar { it.uppercase() } ?: "None"
+        )
+    }
 }

@@ -5,11 +5,14 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -47,7 +50,7 @@ fun MainScreen() {
     val recommendationDao = database.recommendationDao()
     
     val workoutRepository = WorkoutRepository(workoutDao)
-    val recommendationRepository = RecommendationRepository(recommendationDao)
+    val recommendationRepository = RecommendationRepository(recommendationDao, workoutDao)
     
     val authViewModel: AuthViewModel = viewModel()
     val viewModelFactory = FitMeViewModelFactory(workoutRepository, recommendationRepository)
@@ -144,19 +147,20 @@ fun MainScreen() {
                 arguments = listOf(navArgument("recId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val recId = backStackEntry.arguments?.getString("recId") ?: ""
-                RecommendationDetailScreen(
-                    recId = recId,
-                    onBack = { navController.popBackStack() },
-                    onStartWorkout = { _ ->
-                        navController.navigate(Screen.Gym.route) {
-                            popUpTo(Screen.Home.route) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                )
+                val recommendation by recViewModel.selectedRecommendation.collectAsState()
+                
+                LaunchedEffect(recId) {
+                    recViewModel.getRecommendationById(recId)
+                }
+
+                recommendation?.let { data ->
+                    RecommendationDetailScreen(
+                        recommendation = data,
+                        onBack = { navController.popBackStack() }
+                    )
+                } ?: Box(modifier = Modifier.fillMaxSize()) {
+                    CircularProgressIndicator(modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
+                }
             }
 
             composable(Screen.Gym.route) { GymScreen(viewModel) }

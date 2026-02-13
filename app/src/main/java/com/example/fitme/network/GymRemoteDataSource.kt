@@ -1,46 +1,60 @@
+// D:/GDGoC/Android/FitMe/app/src/main/java/com/example/fitme/network/GymRemoteDataSource.kt
+
 package com.example.fitme.network
 
 import android.util.Log
 import com.example.fitme.database.Recommendation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class GymRemoteDataSource(private val apiService: GymApiService) {
 
-    suspend fun getExerciseRecommendations(): List<Recommendation> {
+    // Ambil list ringan untuk menu utama
+    suspend fun getExerciseRecommendations(): List<Recommendation> = withContext(Dispatchers.IO) {
         val allRecommendations = mutableListOf<Recommendation>()
         try {
-            // 1. Get Categories (BodyParts)
-            val bodyPartsResponse = apiService.getBodyParts()
-            val categories = if (bodyPartsResponse.isSuccessful) {
-                bodyPartsResponse.body()?.take(5) ?: listOf("chest", "back", "legs")
-            } else {
-                listOf("chest", "back", "legs")
-            }
-
-            // 2. Get Exercises for each category
+            val categories = listOf("chest", "back", "cardio") // Hardcoded awal biar cepet
             for (category in categories) {
-                val response = apiService.getExercises(bodyPart = category, limit = 3)
-                
+                val response = apiService.getExercises(bodyPart = category, limit = 5)
                 if (response.isSuccessful) {
-                    val exercises = response.body() ?: emptyList()
-                    
-                    val mapped = exercises.map { exercise ->
-                        Recommendation(
-                            id = exercise.id,
-                            title = exercise.name.replaceFirstChar { it.uppercase() },
-                            description = exercise.instructions?.joinToString("\n") ?: "No instructions available",
-                            gifUrl = exercise.gifUrl ?: "",
-                            level = exercise.difficulty?.replaceFirstChar { it.uppercase() } ?: "Intermediate",
-                            category = exercise.bodyPart?.replaceFirstChar { it.uppercase() } ?: category,
-                            target = exercise.target?.replaceFirstChar { it.uppercase() } ?: "General",
-                            equipment = exercise.equipment?.replaceFirstChar { it.uppercase() } ?: "Body weight"
+                    response.body()?.data?.forEach { exercise ->
+                        allRecommendations.add(
+                            Recommendation(
+                                id = exercise.id ?: "",
+                                title = exercise.name?.replaceFirstChar { it.uppercase() } ?: "Unknown",
+                                category = exercise.bodyPart ?: category,
+                                target = exercise.target ?: "General",
+                                gifUrl = "" // Kosongkan di list agar hemat memory
+                            )
                         )
                     }
-                    allRecommendations.addAll(mapped)
                 }
             }
         } catch (e: Exception) {
-            Log.e("GymRemoteDataSource", "Error fetching from API: ${e.message}")
+            Log.e("GymRemoteDataSource", "Error: ${e.message}")
         }
-        return allRecommendations
+        allRecommendations
+    }
+
+    // Ambil detail lengkap termasuk GIF/Video pas di-klik
+    suspend fun getExerciseDetail(id: String): Recommendation? = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getExerciseById(id)
+            if (response.isSuccessful) {
+                val e = response.body() ?: return@withContext null
+                Recommendation(
+                    id = e.id ?: "",
+                    title = e.name?.replaceFirstChar { it.uppercase() } ?: "",
+                    description = e.instructions?.joinToString("\n\n") ?: "No instructions.",
+                    gifUrl = e.imageUrl ?: e.videoUrl ?: "", // Baru kita load di sini
+                    level = e.difficulty ?: "Intermediate",
+                    category = e.bodyPart ?: "",
+                    target = e.target ?: "",
+                    equipment = e.equipment ?: ""
+                )
+            } else null
+        } catch (e: Exception) {
+            null
+        }
     }
 }

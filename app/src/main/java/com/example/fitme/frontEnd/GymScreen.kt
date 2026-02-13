@@ -1,6 +1,8 @@
 package com.example.fitme.frontEnd
 
 import android.content.res.Configuration
+import android.os.Build.VERSION.SDK_INT
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,10 +21,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import com.example.fitme.database.WorkoutLog
 import com.example.fitme.network.ExerciseResponse
 import com.example.fitme.viewModel.FitMeViewModel
@@ -108,7 +114,7 @@ fun GymScreen(viewModel: FitMeViewModel = viewModel()) {
                 ) {
                     items(searchResults) { exercise ->
                         ApiExerciseItem(exercise) {
-                            prefilledName = exercise.name.replaceFirstChar { it.uppercase() }
+                            prefilledName = exercise.name?.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } ?: ""
                             selectedWorkout = null
                             showBottomSheet = true
                         }
@@ -182,23 +188,36 @@ fun GymScreen(viewModel: FitMeViewModel = viewModel()) {
 
 @Composable
 fun ApiExerciseItem(exercise: ExerciseResponse, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val imageLoader = remember {
+        ImageLoader.Builder(context)
+            .components {
+                if (SDK_INT >= 28) add(ImageDecoderDecoder.Factory()) else add(GifDecoder.Factory())
+            }
+            .build()
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
-                model = exercise.gifUrl,
+                model = exercise.imageUrl ?: exercise.videoUrl,
                 contentDescription = null,
-                modifier = Modifier.size(50.dp).clip(RoundedCornerShape(8.dp)),
+                imageLoader = imageLoader,
+                modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(Color.LightGray),
                 contentScale = ContentScale.Crop
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(exercise.name.replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold)
-                Text("${exercise.bodyPart} • ${exercise.equipment}", style = MaterialTheme.typography.bodySmall)
+            Column(Modifier.weight(1f)) {
+                Text(exercise.name?.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } ?: "Unknown", fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(
+                    "${exercise.bodyPart ?: "Unknown"} • ${exercise.target ?: "General"}", 
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            Spacer(modifier = Modifier.weight(1f))
             Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         }
     }

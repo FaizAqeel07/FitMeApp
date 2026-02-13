@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -20,7 +19,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.GifDecoder
@@ -36,7 +34,7 @@ fun DashboardScreen(
     onNavigateToDetail: (String) -> Unit
 ) {
     val logs by viewModel.allWorkouts.collectAsState()
-    val recommendations by recViewModel.recommendations.collectAsState()
+    val recommendations by recViewModel.recommendedExercises.collectAsState()
     val isLoading by recViewModel.isLoading.collectAsState()
     
     val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
@@ -54,16 +52,17 @@ fun DashboardScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp) // Jarak antar item lebih rapat
     ) {
+        // Margin atas ditambah biar greeting turun
         item {
+            Spacer(modifier = Modifier.height(48.dp))
             Text(
                 text = greeting,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(8.dp))
         }
 
         item {
@@ -83,7 +82,6 @@ fun DashboardScreen(
                     StatItem("Vol", "${totalVolume.toInt()}")
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
 
         item {
@@ -98,31 +96,34 @@ fun DashboardScreen(
                     fontWeight = FontWeight.Bold
                 )
                 if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            if (recommendations.isEmpty() && !isLoading) {
-                Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                    Text("No recommendations found.")
-                }
-            } else {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
+        }
+
+        if (recommendations.isEmpty() && !isLoading) {
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    items(recommendations) { workout ->
-                        RecommendedWorkoutCard(workout = workout) { 
-                            onNavigateToDetail(workout.id)
-                        }
+                    Text("No recommendations found", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Button(onClick = { recViewModel.fetchDashboardRecommendations() }) {
+                        Text("Try Again")
                     }
+                }
+            }
+        } else {
+            items(recommendations) { workout ->
+                RecommendedWorkoutCard(workout = workout) {
+                    onNavigateToDetail(workout.id)
                 }
             }
         }
         
         item {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -148,15 +149,16 @@ fun RecommendedWorkoutCard(workout: Recommendation, onClick: () -> Unit) {
 
     Card(
         modifier = Modifier
-            .width(280.dp)
+            .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth()
+                .padding(8.dp) // Padding lebih kecil
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
                 model = workout.gifUrl,
@@ -164,30 +166,31 @@ fun RecommendedWorkoutCard(workout: Recommendation, onClick: () -> Unit) {
                 imageLoader = imageLoader,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp)
+                    .size(64.dp) // Ukuran gambar lebih kecil
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-            Text(
-                workout.title, 
-                fontWeight = FontWeight.Bold, 
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1
-            )
-            Text(
-                text = "${workout.category} • ${workout.target}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = "Equipment: ${workout.equipment}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column {
+                Text(
+                    workout.title, 
+                    fontWeight = FontWeight.Bold, 
+                    style = MaterialTheme.typography.bodyMedium, // Font lebih kecil
+                    maxLines = 1
+                )
+                Text(
+                    text = "${workout.category} • ${workout.target}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Equip: ${workout.equipment}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

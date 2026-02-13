@@ -49,10 +49,9 @@ class FitMeViewModel(private val repository: WorkoutRepository) : ViewModel() {
         _isSearching.value = true
         viewModelScope.launch {
             try {
-                // Menggunakan endpoint searchExercises yang baru
                 val response = apiService.searchExercises(query = query, limit = 20)
                 if (response.isSuccessful) {
-                    _searchResults.value = response.body() ?: emptyList()
+                    _searchResults.value = response.body()?.data ?: emptyList()
                 } else {
                     Log.e("FitMeViewModel", "Search Error: ${response.code()}")
                 }
