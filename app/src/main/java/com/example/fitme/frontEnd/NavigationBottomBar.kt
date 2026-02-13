@@ -14,4 +14,7 @@ sealed class Screen(val route: String, val title: String = "", val icon: ImageVe
     object Gym : Screen("gym", "Gym", Icons.Default.FitnessCenter)
     object Running : Screen("running", "Run", Icons.AutoMirrored.Filled.DirectionsRun)
     object Profile : Screen("profile", "Profile", Icons.Default.Person)
+    object RecommendationDetail : Screen("recommendation_detail/{recId}") {
+        fun createRoute(recId: String) = "recommendation_detail/$recId"
+    }
 }

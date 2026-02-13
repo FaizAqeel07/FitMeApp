@@ -4,11 +4,15 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.example.fitme.DAO.GymDao
+import com.example.fitme.DAO.RecommendationDao
 import com.example.fitme.DAO.WorkoutDao
 
-@Database(entities = [WorkoutLog::class], version = 2, exportSchema = false)
+@Database(entities = [WorkoutLog::class, Recommendation::class, Gym::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
+    abstract fun recommendationDao(): RecommendationDao
+    abstract fun gymDao(): GymDao
 
     companion object {
         @Volatile
@@ -21,7 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "fitme_database"
                 )
-                    .fallbackToDestructiveMigration() // Menghapus data lama jika skema berubah
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance

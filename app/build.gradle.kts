@@ -17,6 +17,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // RapidAPI Keys
+        buildConfigField("String", "RAPIDAPI_KEY", "\"${project.findProperty("RAPID_API_KEY") ?: "e7fc2e5d9dmsha3ea2cf98bc2301p1d6c3fjsnc8420a7ae03c"}\"")
+        buildConfigField("String", "RAPIDAPI_HOST", "\"edb-with-videos-and-images-by-ascendapi.p.rapidapi.com\"")
     }
 
     buildTypes {
@@ -34,6 +38,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -55,6 +60,10 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     implementation(libs.kotlinx.coroutines.play.services)
+    
+    // Coil untuk GIF & Image Loading
+    implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -77,4 +86,8 @@ dependencies {
     // Material Icons (Extended) untuk icon gym/run
     implementation(libs.androidx.compose.material.icons.extended)
 
+    // Retrofit
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp.logging)
 }

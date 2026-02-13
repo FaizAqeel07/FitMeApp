@@ -5,12 +5,10 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -19,22 +17,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.compose.*
+import androidx.navigation.navArgument
 import com.example.fitme.database.AppDatabase
-import com.example.fitme.frontEnd.DashboardScreen
-import com.example.fitme.frontEnd.GymScreen
-import com.example.fitme.frontEnd.LoginScreen
-import com.example.fitme.frontEnd.ProfileScreen
-import com.example.fitme.frontEnd.RegisterScreen
-import com.example.fitme.frontEnd.Screen
+import com.example.fitme.frontEnd.*
 import com.example.fitme.repositoryViewModel.WorkoutRepository
 import com.example.fitme.ui.theme.FitMeTheme
-import com.example.fitme.viewModel.AuthViewModel
-import com.example.fitme.viewModel.FitMeViewModel
-import com.example.fitme.viewModel.FitMeViewModelFactory
+import com.example.fitme.viewModel.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,10 +44,7 @@ fun MainScreen() {
     val database = AppDatabase.getDatabase(context)
     val dao = database.workoutDao()
     
-    // Initialize Repository
     val repository = WorkoutRepository(dao)
-    
-    // Initialize ViewModels
     val authViewModel: AuthViewModel = viewModel()
     val viewModelFactory = FitMeViewModelFactory(repository)
     val viewModel: FitMeViewModel = viewModel(factory = viewModelFactory)
@@ -68,7 +55,6 @@ fun MainScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     
-    // Determine if we should show the bottom bar
     val showBottomBar = currentDestination?.route in listOf(
         Screen.Home.route, Screen.Gym.route, Screen.Running.route, Screen.Profile.route
     )
@@ -85,7 +71,11 @@ fun MainScreen() {
                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                             onClick = {
                                 navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    // Professional Navigation: Pop up to the start destination of the graph to
+                                    // avoid building up a large stack of destinations
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
                                     launchSingleTop = true
                                     restoreState = true
                                 }
@@ -94,7 +84,8 @@ fun MainScreen() {
                     }
                 }
             }
-        }
+        },
+        contentWindowInsets = WindowInsets.navigationBars // Menangani padding sistem secara otomatis
     ) { innerPadding ->
         NavHost(
             navController = navController,
@@ -134,7 +125,36 @@ fun MainScreen() {
                     onNavigateToLogin = { navController.popBackStack() }
                 )
             }
-            composable(Screen.Home.route) { DashboardScreen(viewModel) }
+            composable(Screen.Home.route) { 
+                DashboardScreen(
+                    viewModel = viewModel,
+                    onNavigateToDetail = { recId ->
+                        navController.navigate(Screen.RecommendationDetail.createRoute(recId))
+                    }
+                ) 
+            }
+            
+            composable(
+                route = Screen.RecommendationDetail.route,
+                arguments = listOf(navArgument("recId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val recId = backStackEntry.arguments?.getString("recId") ?: ""
+                RecommendationDetailScreen(
+                    recId = recId,
+                    onBack = { navController.popBackStack() },
+                    onStartWorkout = { _ ->
+                        // PROFESSIONAL FIX: Navigate with clearing the detail from stack
+                        navController.navigate(Screen.Gym.route) {
+                            popUpTo(Screen.Home.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
+
             composable(Screen.Gym.route) { GymScreen(viewModel) }
             composable(Screen.Running.route) { /* Running Screen */ }
             composable(Screen.Profile.route) { 
