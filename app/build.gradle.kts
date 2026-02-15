@@ -53,6 +53,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.runtime)
+    implementation(libs.androidx.compose.runtime.livedata)
     implementation(libs.firebase.database)
     implementation(libs.firebase.auth)
     implementation(libs.play.services.auth)
@@ -78,10 +79,11 @@ dependencies {
     // Room Database (Penyimpanan Lokal)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx) // Wajib untuk Coroutines
-    ksp(libs.androidx.room.compiler) //
+    ksp(libs.androidx.room.compiler)
 
     // ViewModel & LiveData
     implementation(libs.androidx.lifecycle.viewmodel.compose.v261)
+    implementation(libs.androidx.lifecycle.service)
 
     // Material Icons (Extended) untuk icon gym/run
     implementation(libs.androidx.compose.material.icons.extended)
@@ -92,4 +94,11 @@ dependencies {
     implementation(libs.okhttp.logging)
 
     implementation(libs.coil.compose.v240)
+
+    // OSMDroid (Free Map Alternative)
+    implementation(libs.osmdroid)
+    implementation(libs.play.services.location)
+    
+    // Permissions
+    implementation(libs.google.accompanist.permissions)
 }

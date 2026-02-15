@@ -4,11 +4,17 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import com.example.fitme.DAO.GymDao
 import com.example.fitme.DAO.RecommendationDao
 import com.example.fitme.DAO.WorkoutDao
 
-@Database(entities = [WorkoutLog::class, Recommendation::class, Gym::class], version = 5, exportSchema = false)
+@Database(
+    entities = [WorkoutLog::class, Recommendation::class, GymSession::class, Gym::class], 
+    version = 7, 
+    exportSchema = false
+)
+@TypeConverters(GymConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
     abstract fun recommendationDao(): RecommendationDao
@@ -25,7 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "fitme_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

@@ -27,6 +27,7 @@ import com.example.fitme.database.AppDatabase
 import com.example.fitme.frontEnd.*
 import com.example.fitme.repositoryViewModel.RecommendationRepository
 import com.example.fitme.repositoryViewModel.WorkoutRepository
+import com.example.fitme.repositoryViewModel.RunningRepository
 import com.example.fitme.ui.theme.FitMeTheme
 import com.example.fitme.viewModel.*
 
@@ -51,12 +52,14 @@ fun MainScreen() {
     
     val workoutRepository = WorkoutRepository(workoutDao)
     val recommendationRepository = RecommendationRepository(recommendationDao, workoutDao)
+    val runningRepository = RunningRepository()
     
     val authViewModel: AuthViewModel = viewModel()
-    val viewModelFactory = FitMeViewModelFactory(workoutRepository, recommendationRepository)
+    val viewModelFactory = FitMeViewModelFactory(workoutRepository, recommendationRepository, runningRepository)
     
     val viewModel: FitMeViewModel = viewModel(factory = viewModelFactory)
     val recViewModel: RecommendationViewModel = viewModel(factory = viewModelFactory)
+    val runningViewModel: RunningViewModel = viewModel(factory = viewModelFactory)
 
     val navController = rememberNavController()
     val currentUser by authViewModel.currentUser.collectAsState()
@@ -136,10 +139,21 @@ fun MainScreen() {
                 DashboardScreen(
                     viewModel = viewModel,
                     recViewModel = recViewModel,
+                    runningViewModel = runningViewModel,
                     onNavigateToDetail = { recId ->
                         navController.navigate(Screen.RecommendationDetail.createRoute(recId))
+                    },
+                    onNavigateToAddGym = {
+                        navController.navigate("add_gym_session")
                     }
                 ) 
+            }
+            
+            composable("add_gym_session") {
+                AddGymSessionScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
             }
             
             composable(
@@ -163,8 +177,18 @@ fun MainScreen() {
                 }
             }
 
-            composable(Screen.Gym.route) { GymScreen(viewModel) }
-            composable(Screen.Running.route) { /* Running Screen */ }
+            composable(Screen.Gym.route) { 
+                GymScreen(
+                    viewModel = viewModel,
+                    onNavigateToAddSession = {
+                        navController.navigate("add_gym_session")
+                    }
+                ) 
+            }
+
+            composable(Screen.Running.route) { 
+                RunningScreen(runningViewModel) 
+            }
             composable(Screen.Profile.route) { 
                 ProfileScreen(
                     onLogout = {
