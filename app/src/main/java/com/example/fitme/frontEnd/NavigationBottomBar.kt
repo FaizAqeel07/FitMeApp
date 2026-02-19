@@ -17,4 +17,7 @@ sealed class Screen(val route: String, val title: String = "", val icon: ImageVe
     object RecommendationDetail : Screen("recommendation_detail/{recId}") {
         fun createRoute(recId: String) = "recommendation_detail/$recId"
     }
+    object GymSessionDetail : Screen("gym_session_detail/{sessionId}") {
+        fun createRoute(sessionId: String) = "gym_session_detail/$sessionId"
+    }
 }

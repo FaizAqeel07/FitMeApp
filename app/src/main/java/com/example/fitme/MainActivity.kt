@@ -28,6 +28,7 @@ import com.example.fitme.frontEnd.*
 import com.example.fitme.repositoryViewModel.RecommendationRepository
 import com.example.fitme.repositoryViewModel.WorkoutRepository
 import com.example.fitme.repositoryViewModel.RunningRepository
+import com.example.fitme.repositoryViewModel.GymRepository
 import com.example.fitme.ui.theme.FitMeTheme
 import com.example.fitme.viewModel.*
 
@@ -49,13 +50,23 @@ fun MainScreen() {
     val database = AppDatabase.getDatabase(context)
     val workoutDao = database.workoutDao()
     val recommendationDao = database.recommendationDao()
+    val gymDao = database.gymDao() // Tambahkan gymDao
     
     val workoutRepository = WorkoutRepository(workoutDao)
-    val recommendationRepository = RecommendationRepository(recommendationDao, workoutDao)
+    val recommendationRepository = RecommendationRepository(recommendationDao, workoutDao, context)
     val runningRepository = RunningRepository()
+    val gymRepository = GymRepository(gymDao) // Inisialisasi GymRepository
     
     val authViewModel: AuthViewModel = viewModel()
-    val viewModelFactory = FitMeViewModelFactory(workoutRepository, recommendationRepository, runningRepository)
+    
+    // Berikan gymRepository ke Factory
+    val viewModelFactory = FitMeViewModelFactory(
+        workoutRepository, 
+        recommendationRepository, 
+        runningRepository, 
+        gymRepository, 
+        context
+    )
     
     val viewModel: FitMeViewModel = viewModel(factory = viewModelFactory)
     val recViewModel: RecommendationViewModel = viewModel(factory = viewModelFactory)
@@ -145,6 +156,9 @@ fun MainScreen() {
                     },
                     onNavigateToAddGym = {
                         navController.navigate("add_gym_session")
+                    },
+                    onNavigateToSessionDetail = { sessionId ->
+                        navController.navigate(Screen.GymSessionDetail.createRoute(sessionId))
                     }
                 ) 
             }
@@ -152,6 +166,10 @@ fun MainScreen() {
             composable("add_gym_session") {
                 AddGymSessionScreen(
                     viewModel = viewModel,
+                    recViewModel = recViewModel,
+                    onNavigateToDetail = { recId ->
+                        navController.navigate(Screen.RecommendationDetail.createRoute(recId))
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -177,11 +195,26 @@ fun MainScreen() {
                 }
             }
 
+            composable(
+                route = Screen.GymSessionDetail.route,
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
+                GymSessionDetailScreen(
+                    sessionId = sessionId,
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable(Screen.Gym.route) { 
                 GymScreen(
                     viewModel = viewModel,
                     onNavigateToAddSession = {
                         navController.navigate("add_gym_session")
+                    },
+                    onNavigateToSessionDetail = { sessionId ->
+                        navController.navigate(Screen.GymSessionDetail.createRoute(sessionId))
                     }
                 ) 
             }

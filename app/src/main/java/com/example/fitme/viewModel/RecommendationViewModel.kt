@@ -9,18 +9,15 @@ import kotlinx.coroutines.launch
 
 class RecommendationViewModel(private val repository: RecommendationRepository) : ViewModel() {
 
-    // Data dari Room (Local Cache) - Digunakan untuk list lengkap
     val recommendations: StateFlow<List<Recommendation>> = repository.allRecommendations.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
 
-    // Data Random dari API (Dynamic Recommendations) - Khusus Dashboard
     private val _recommendedExercises = MutableStateFlow<List<Recommendation>>(emptyList())
     val recommendedExercises = _recommendedExercises.asStateFlow()
     
-    // Alias untuk Dashboard agar lebih jelas (Hasil Audit)
     val dashboardItems = recommendedExercises
 
     private val _isLoading = MutableStateFlow(false)
@@ -30,9 +27,7 @@ class RecommendationViewModel(private val repository: RecommendationRepository) 
     val selectedRecommendation = _selectedRecommendation.asStateFlow()
 
     init {
-        // Refresh local cache di background
         refreshRecommendations()
-        // Ambil data untuk dashboard saat init
         fetchDashboardRecommendations()
     }
 
@@ -49,24 +44,24 @@ class RecommendationViewModel(private val repository: RecommendationRepository) 
                 val data = repository.getRandomRecommendations()
                 _recommendedExercises.value = data
             } catch (e: Exception) {
-                // Handle error
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    fun addToHistory(rec: Recommendation) {
-        viewModelScope.launch { repository.addExerciseToHistory(rec) }
-    }
-
-    fun saveToFirebase(title: String) {
-        viewModelScope.launch { repository.saveExerciseToFirebase(title) }
-    }
-
     fun getRecommendationById(id: String) {
         viewModelScope.launch { 
             _selectedRecommendation.value = repository.getRecommendationById(id) 
         }
+    }
+
+    // [TAMBAHAN] Set detail secara manual dari hasil search
+    fun selectRecommendation(recommendation: Recommendation) {
+        _selectedRecommendation.value = recommendation
+    }
+
+    fun addExerciseToHistory(rec: Recommendation) {
+        viewModelScope.launch { repository.addExerciseToHistory(rec) }
     }
 }

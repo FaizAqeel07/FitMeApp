@@ -26,7 +26,8 @@ import java.util.*
 @Composable
 fun GymScreen(
     viewModel: FitMeViewModel,
-    onNavigateToAddSession: () -> Unit
+    onNavigateToAddSession: () -> Unit,
+    onNavigateToSessionDetail: (String) -> Unit // TAMBAHKAN INI
 ) {
     val sessions by viewModel.gymSessions.collectAsState()
 
@@ -75,7 +76,9 @@ fun GymScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(sessions) { session ->
-                        GymSessionItem(session)
+                        GymSessionItem(session) {
+                            onNavigateToSessionDetail(session.id) // Klik untuk ke detail
+                        }
                     }
                 }
             }
@@ -84,11 +87,13 @@ fun GymScreen(
 }
 
 @Composable
-fun GymSessionItem(session: GymSession) {
+fun GymSessionItem(session: GymSession, onClick: () -> Unit) {
     val dateStr = SimpleDateFormat("EEEE, dd MMM", Locale.getDefault()).format(Date(session.date))
     
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick), // Buat card bisa diklik
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
     ) {

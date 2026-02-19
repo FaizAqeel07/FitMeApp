@@ -2,13 +2,14 @@ package com.example.fitme.viewModel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.fitme.database.Gym
 import com.example.fitme.database.GymSession
+import com.example.fitme.database.Recommendation
 import com.example.fitme.database.WorkoutLog
-import com.example.fitme.network.ExerciseResponse
-import com.example.fitme.network.GymApiService
 import com.example.fitme.repositoryViewModel.WorkoutRepository
+import com.example.fitme.repositoryViewModel.RecommendationRepository
+import com.example.fitme.repositoryViewModel.GymRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,18 +17,33 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class FitMeViewModel(private val repository: WorkoutRepository) : ViewModel() {
-    private val apiService = GymApiService.create()
+class FitMeViewModel(
+    private val repository: WorkoutRepository,
+    private val recommendationRepository: RecommendationRepository,
+    private val gymRepository: GymRepository // Integrated
+) : ViewModel() {
 
-    private val _searchResults = MutableStateFlow<List<ExerciseResponse>>(emptyList())
+    private val _searchResults = MutableStateFlow<List<Recommendation>>(emptyList())
     val searchResults = _searchResults.asStateFlow()
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching = _isSearching.asStateFlow()
 
-    // --- SESSION LOGIC (NEW SYSTEM) ---
+    private val _sessionName = MutableStateFlow("")
+    val sessionName = _sessionName.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery = _searchQuery.asStateFlow()
+
     private val _currentSessionExercises = MutableStateFlow<List<WorkoutLog>>(emptyList())
     val currentSessionExercises = _currentSessionExercises.asStateFlow()
+
+    // Integrated logic from GymViewModel
+    val allGyms: StateFlow<List<Gym>> = gymRepository.getAllGyms().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
     val allWorkouts: StateFlow<List<WorkoutLog>> = repository.getAllWorkoutsLocal().stateIn(
         scope = viewModelScope,
@@ -41,69 +57,40 @@ class FitMeViewModel(private val repository: WorkoutRepository) : ViewModel() {
         initialValue = emptyList()
     )
 
+    init {
+        refreshGyms()
+    }
+
+    fun refreshGyms() {
+        viewModelScope.launch { gymRepository.refreshGyms() }
+    }
+
+    fun updateSessionName(name: String) { _sessionName.value = name }
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+        searchExercises(query)
+    }
+
     fun searchExercises(query: String) {
         if (query.isBlank()) {
             _searchResults.value = emptyList()
+            _isSearching.value = false
             return
         }
         _isSearching.value = true
         viewModelScope.launch {
             try {
-                val response = apiService.searchExercises(query = query, limit = 20)
-                if (response.isSuccessful) {
-                    _searchResults.value = response.body()?.data ?: emptyList()
-                }
+                val results = recommendationRepository.searchLocalExercises(query)
+                _searchResults.value = results
             } catch (e: Exception) {
-                Log.e("FitMeViewModel", "Search failed: ${e.message}")
+                Log.e("FitMeViewModel", "Local search failed: ${e.message}")
             } finally {
                 _isSearching.value = false
             }
         }
     }
 
-    // --- OLD SYSTEM LOGIC (Untuk GymScreen.kt) ---
-    fun addWorkout(name: String, weight: String, reps: String, sets: String) {
-        val w = weight.toDoubleOrNull() ?: 0.0
-        val r = reps.toIntOrNull() ?: 0
-        val s = sets.toIntOrNull() ?: 0
-        viewModelScope.launch {
-            val newWorkout = WorkoutLog(
-                exerciseName = name,
-                weight = w,
-                reps = r,
-                sets = s,
-                volume = w * r * s,
-                date = System.currentTimeMillis()
-            )
-            repository.insertWorkout(newWorkout)
-        }
-    }
-
-    fun updateWorkout(workout: WorkoutLog, name: String, weight: String, reps: String, sets: String) {
-        val w = weight.toDoubleOrNull() ?: 0.0
-        val r = reps.toIntOrNull() ?: 0
-        val s = sets.toIntOrNull() ?: 0
-        viewModelScope.launch {
-            val updatedWorkout = workout.copy(
-                exerciseName = name,
-                weight = w,
-                reps = r,
-                sets = s,
-                volume = w * r * s
-            )
-            // Note: Perlu tambahin updateWorkout di Repository jika belum ada
-            // repository.updateWorkout(updatedWorkout)
-        }
-    }
-
-    fun deleteWorkout(workout: WorkoutLog) {
-        viewModelScope.launch {
-            // Note: Perlu tambahin deleteWorkout di Repository jika belum ada
-            // repository.deleteWorkout(workout)
-        }
-    }
-
-    // --- SESSION LOGIC HELPERS ---
     fun addExerciseToDraft(exerciseName: String) {
         val current = _currentSessionExercises.value.toMutableList()
         current.add(WorkoutLog(exerciseName = exerciseName, date = System.currentTimeMillis()))
@@ -129,22 +116,32 @@ class FitMeViewModel(private val repository: WorkoutRepository) : ViewModel() {
         }
     }
 
-    fun saveFullSession(sessionName: String, onSuccess: () -> Unit) {
+    fun saveFullSession(onSuccess: () -> Unit) {
         val exercises = _currentSessionExercises.value
+        val name = _sessionName.value
         if (exercises.isEmpty()) return
+        
         viewModelScope.launch {
             val totalVol = exercises.sumOf { it.volume }
             val newSession = GymSession(
-                sessionName = sessionName.ifBlank { "Workout Session" },
+                sessionName = name.ifBlank { "Workout Session" },
                 date = System.currentTimeMillis(),
                 totalVolume = totalVol,
                 exercises = exercises
             )
             repository.saveGymSession(newSession)
+            
             _currentSessionExercises.value = emptyList()
+            _sessionName.value = ""
+            _searchQuery.value = ""
+            _searchResults.value = emptyList()
+            
             onSuccess()
         }
     }
 
-    fun clearSearch() { _searchResults.value = emptyList() }
+    fun clearSearch() { 
+        _searchQuery.value = ""
+        _searchResults.value = emptyList() 
+    }
 }

@@ -20,4 +20,8 @@ interface RecommendationDao {
 
     @Query("DELETE FROM recommendations")
     suspend fun clearAll()
+
+    // Search query for Local JSON data in Room
+    @Query("SELECT * FROM recommendations WHERE title LIKE '%' || :query || '%' OR target LIKE '%' || :query || '%'")
+    suspend fun searchExercises(query: String): List<Recommendation>
 }

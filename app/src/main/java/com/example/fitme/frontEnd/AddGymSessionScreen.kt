@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -19,16 +20,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.fitme.database.WorkoutLog
 import com.example.fitme.viewModel.FitMeViewModel
+import com.example.fitme.viewModel.RecommendationViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddGymSessionScreen(
     viewModel: FitMeViewModel,
+    recViewModel: RecommendationViewModel,
+    onNavigateToDetail: (String) -> Unit,
     onBack: () -> Unit
 ) {
-    var sessionName by remember { mutableStateOf("") }
-    var searchQuery by remember { mutableStateOf("") }
+    val sessionName by viewModel.sessionName.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    
     val searchResults by viewModel.searchResults.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
     val draftExercises by viewModel.currentSessionExercises.collectAsState()
@@ -42,7 +48,7 @@ fun AddGymSessionScreen(
                 },
                 actions = {
                     TextButton(
-                        onClick = { viewModel.saveFullSession(sessionName) { onBack() } },
+                        onClick = { viewModel.saveFullSession { onBack() } },
                         enabled = draftExercises.isNotEmpty()
                     ) {
                         Text("SAVE", fontWeight = FontWeight.Bold)
@@ -52,22 +58,17 @@ fun AddGymSessionScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            // Header: Session Name
             OutlinedTextField(
                 value = sessionName,
-                onValueChange = { sessionName = it },
+                onValueChange = { viewModel.updateSessionName(it) },
                 label = { Text("Session Name (e.g. Chest Day)") },
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 singleLine = true
             )
 
-            // Search Box
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { 
-                    searchQuery = it
-                    viewModel.searchExercises(it)
-                },
+                onValueChange = { viewModel.updateSearchQuery(it) },
                 label = { Text("Search & Add Exercise") },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 trailingIcon = {
@@ -76,21 +77,49 @@ fun AddGymSessionScreen(
                 }
             )
 
-            // Search Results (Dropdown-like)
-            if (searchQuery.isNotEmpty() && searchResults.isNotEmpty()) {
+            if (searchQuery.isNotEmpty()) {
                 Card(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(max = 200.dp),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(max = 400.dp),
                     elevation = CardDefaults.cardElevation(8.dp)
                 ) {
                     LazyColumn {
-                        items(searchResults) { exercise ->
+                        item {
                             ListItem(
-                                headlineContent = { Text(exercise.name ?: "Unknown") },
-                                supportingContent = { Text("${exercise.bodyPart} • ${exercise.target}") },
+                                headlineContent = { Text("Add '$searchQuery' as custom", color = MaterialTheme.colorScheme.primary) },
+                                leadingContent = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary) },
                                 modifier = Modifier.clickable {
-                                    viewModel.addExerciseToDraft(exercise.name ?: "Unknown")
-                                    searchQuery = "" // Clear search
+                                    viewModel.addExerciseToDraft(searchQuery)
                                     viewModel.clearSearch()
+                                }
+                            )
+                            HorizontalDivider(thickness = 0.5.dp)
+                        }
+
+                        items(searchResults) { exercise ->
+                            // FIXED: 'exercise' is already a Recommendation object from Local Room, 
+                            // so we remove .toRecommendation() which caused the error.
+                            ListItem(
+                                headlineContent = { Text(exercise.title, fontWeight = FontWeight.Bold) },
+                                supportingContent = { 
+                                    Column {
+                                        Text("Target: ${exercise.target}", style = MaterialTheme.typography.bodySmall)
+                                        Text("Equipment: ${exercise.equipment}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                },
+                                trailingContent = {
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.addExerciseToDraft(exercise.title)
+                                            viewModel.clearSearch()
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.AddCircle, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                },
+                                modifier = Modifier.clickable {
+                                    // KLIK ITEM UNTUK LIHAT DETAIL
+                                    recViewModel.selectRecommendation(exercise)
+                                    onNavigateToDetail(exercise.id)
                                 }
                             )
                         }
@@ -105,17 +134,18 @@ fun AddGymSessionScreen(
                 color = MaterialTheme.colorScheme.primary
             )
 
-            // Draft Exercises List
             LazyColumn(
                 modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 itemsIndexed(draftExercises) { index, exercise ->
-                    DraftExerciseCard(
-                        exerciseName = exercise.exerciseName,
-                        onUpdate = { w, r, s -> viewModel.updateDraftExercise(index, w, r, s) },
-                        onRemove = { viewModel.removeExerciseFromDraft(index) }
-                    )
+                    key(exercise.exerciseName + index) {
+                        DraftExerciseCard(
+                            exercise = exercise,
+                            onUpdate = { w, r, s -> viewModel.updateDraftExercise(index, w, r, s) },
+                            onRemove = { viewModel.removeExerciseFromDraft(index) }
+                        )
+                    }
                 }
             }
         }
@@ -124,13 +154,19 @@ fun AddGymSessionScreen(
 
 @Composable
 fun DraftExerciseCard(
-    exerciseName: String,
+    exercise: WorkoutLog,
     onUpdate: (String, String, String) -> Unit,
     onRemove: () -> Unit
 ) {
-    var weight by remember { mutableStateOf("") }
-    var sets by remember { mutableStateOf("") }
-    var reps by remember { mutableStateOf("") }
+    var weight by rememberSaveable(exercise.exerciseName) { 
+        mutableStateOf(if (exercise.weight > 0.0) exercise.weight.toString() else "")
+    }
+    var sets by rememberSaveable(exercise.exerciseName) { 
+        mutableStateOf(if (exercise.sets > 0) exercise.sets.toString() else "") 
+    }
+    var reps by rememberSaveable(exercise.exerciseName) { 
+        mutableStateOf(if (exercise.reps > 0) exercise.reps.toString() else "") 
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -138,13 +174,22 @@ fun DraftExerciseCard(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(exerciseName, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(exercise.exerciseName, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 IconButton(onClick = onRemove) { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CompactInput(value = weight, label = "Kg") { weight = it; onUpdate(weight, reps, sets) }
-                CompactInput(value = sets, label = "Sets") { sets = it; onUpdate(weight, reps, sets) }
-                CompactInput(value = reps, label = "Reps") { reps = it; onUpdate(weight, reps, sets) }
+                CompactInput(value = weight, label = "Kg") { 
+                    weight = it
+                    onUpdate(weight, reps, sets) 
+                }
+                CompactInput(value = sets, label = "Sets") { 
+                    sets = it
+                    onUpdate(weight, reps, sets) 
+                }
+                CompactInput(value = reps, label = "Reps") { 
+                    reps = it
+                    onUpdate(weight, reps, sets) 
+                }
             }
         }
     }

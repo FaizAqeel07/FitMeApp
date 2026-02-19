@@ -26,6 +26,7 @@ import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import com.example.fitme.database.GymSession
 import com.example.fitme.database.Recommendation
 import com.example.fitme.database.RunningSession
 import com.example.fitme.database.WorkoutLog
@@ -42,9 +43,11 @@ fun DashboardScreen(
     recViewModel: RecommendationViewModel,
     runningViewModel: RunningViewModel,
     onNavigateToDetail: (String) -> Unit,
-    onNavigateToAddGym: () -> Unit // TAMBAHKAN INI
+    onNavigateToAddGym: () -> Unit,
+    onNavigateToSessionDetail: (String) -> Unit // TAMBAHKAN INI
 ) {
     val logs by viewModel.allWorkouts.collectAsState()
+    val gymSessions by viewModel.gymSessions.collectAsState()
     val recommendations by recViewModel.recommendedExercises.collectAsState()
     val runningHistory by runningViewModel.runningHistory.collectAsState()
     val isLoading by recViewModel.isLoading.collectAsState()
@@ -91,7 +94,7 @@ fun DashboardScreen(
                 Icon(Icons.Default.Add, contentDescription = "Add Session")
             }
         },
-        containerColor = Color.Transparent // Biar background utama nggak ketutup
+        containerColor = Color.Transparent
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -173,12 +176,13 @@ fun DashboardScreen(
                 Text("Recent History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
-            val combinedHistory = (logs.map { "gym" to it } + runningHistory.map { "run" to it })
+            // Combined history using GymSession instead of individual logs
+            val combinedHistory = (gymSessions.map { "gym" to it } + runningHistory.map { "run" to it })
                 .sortedByDescending { 
-                    if (it.second is WorkoutLog) (it.second as WorkoutLog).date 
+                    if (it.second is GymSession) (it.second as GymSession).date 
                     else (it.second as RunningSession).startTime 
                 }
-                .take(4)
+                .take(6)
 
             if (combinedHistory.isEmpty()) {
                 item {
@@ -187,7 +191,9 @@ fun DashboardScreen(
             } else {
                 items(combinedHistory) { item ->
                     if (item.first == "gym") {
-                        GymHistoryCard(item.second as WorkoutLog)
+                        GymSessionHistoryCard(item.second as GymSession) {
+                            onNavigateToSessionDetail((item.second as GymSession).id)
+                        }
                     } else {
                         RunningHistoryCard(item.second as RunningSession)
                     }
@@ -195,6 +201,32 @@ fun DashboardScreen(
             }
             
             item { Spacer(modifier = Modifier.height(24.dp)) }
+        }
+    }
+}
+
+@Composable
+fun GymSessionHistoryCard(session: GymSession, onClick: () -> Unit) {
+    val dateStr = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(session.date))
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) { Icon(Icons.Default.FitnessCenter, null, tint = MaterialTheme.colorScheme.secondary) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(session.sessionName, fontWeight = FontWeight.Bold)
+                Text("$dateStr • ${session.exercises.size} Exercises", style = MaterialTheme.typography.bodySmall)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${session.totalVolume.toInt()}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("Kg Vol", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            }
         }
     }
 }

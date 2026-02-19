@@ -28,9 +28,15 @@ class WorkoutRepository(private val dao: WorkoutDao) {
             val firebaseRef = database.getReference("users").child(uid).child("gym_sessions").push()
             val sessionWithId = session.copy(id = firebaseRef.key ?: "")
             
-            // Simpan ke Firebase
+            // 1. Simpan Session ke Firebase
             firebaseRef.setValue(sessionWithId).await()
-            Log.d("WorkoutRepository", "Gym session saved to Firebase")
+            
+            // 2. [PERBAIKAN] Bongkar exercises dan simpan ke Local Room agar muncul di Recent History
+            // Kita beri timestamp yang sama dengan session agar sinkron
+            val logsToSave = session.exercises.map { it.copy(date = session.date) }
+            dao.insertAll(logsToSave)
+            
+            Log.d("WorkoutRepository", "Gym session and logs saved successfully")
         } catch (e: Exception) {
             Log.e("WorkoutRepository", "Failed to save gym session: ${e.message}")
         }
@@ -56,7 +62,6 @@ class WorkoutRepository(private val dao: WorkoutDao) {
         awaitClose { ref.removeEventListener(listener) }
     }
 
-    // Fungsi lama untuk workout tunggal (tetap dipertahankan jika perlu)
     suspend fun insertWorkout(workout: WorkoutLog) {
         val uid = auth.currentUser?.uid
         if (uid != null) {
@@ -66,10 +71,28 @@ class WorkoutRepository(private val dao: WorkoutDao) {
                 dao.insertWorkout(workoutWithKey)
                 firebaseRef.setValue(workoutWithKey).await()
             } catch (e: Exception) {
-                Log.e("WorkoutRepository", "Gagal: ${e.message}")
+                Log.e("WorkoutRepository", "Gagal insert: ${e.message}")
             }
         } else {
             dao.insertWorkout(workout)
+        }
+    }
+
+    suspend fun updateWorkout(workout: WorkoutLog) {
+        dao.updateWorkout(workout)
+        val uid = auth.currentUser?.uid
+        if (uid != null && workout.firebaseKey != null) {
+            database.getReference("users").child(uid).child("workouts")
+                .child(workout.firebaseKey).setValue(workout).await()
+        }
+    }
+
+    suspend fun deleteWorkout(workout: WorkoutLog) {
+        dao.deleteWorkout(workout)
+        val uid = auth.currentUser?.uid
+        if (uid != null && workout.firebaseKey != null) {
+            database.getReference("users").child(uid).child("workouts")
+                .child(workout.firebaseKey).removeValue().await()
         }
     }
 }
