@@ -1,3 +1,6 @@
+import org.gradle.api.JavaVersion
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -12,15 +15,11 @@ android {
     defaultConfig {
         applicationId = "com.example.fitme"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
-        // RapidAPI Keys
-        buildConfigField("String", "RAPIDAPI_KEY", "\"e7fc2e5d9dmsha3ea2cf98bc2301p1d6c3fjsnc8420a7ae03c\"")
-        buildConfigField("String", "RAPIDAPI_HOST", "\"edb-with-videos-and-images-by-ascendapi.p.rapidapi.com\"")
     }
 
     buildTypes {
@@ -32,13 +31,22 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+// Cara modern dan aman untuk mengatur jvmTarget
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
     }
 }
 
@@ -73,19 +81,20 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    
     // Navigation Compose
     implementation(libs.androidx.navigation.compose)
 
     // Room Database (Penyimpanan Lokal)
     implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx) // Wajib untuk Coroutines
+    implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
     // ViewModel & LiveData
     implementation(libs.androidx.lifecycle.viewmodel.compose.v261)
     implementation(libs.androidx.lifecycle.service)
 
-    // Material Icons (Extended) untuk icon gym/run
+    // Material Icons (Extended)
     implementation(libs.androidx.compose.material.icons.extended)
 
     // Retrofit
@@ -95,7 +104,7 @@ dependencies {
 
     implementation(libs.coil.compose.v240)
 
-    // OSMDroid (Free Map Alternative)
+    // OSMDroid
     implementation(libs.osmdroid)
     implementation(libs.play.services.location)
     

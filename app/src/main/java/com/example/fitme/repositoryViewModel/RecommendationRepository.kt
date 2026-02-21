@@ -26,40 +26,43 @@ class RecommendationRepository(
 
     val allRecommendations: Flow<List<Recommendation>> = recommendationDao.getAllRecommendations()
 
-    // Fungsi Seeding: Hanya dijalankan jika database masih kosong
+    // Fungsi Seeding: Paksa update jika data instruksi kosong atau ingin refresh data
     suspend fun fetchAndSaveRecommendations() {
         try {
-            // Cek dulu apakah database sudah ada isinya
             val currentData = recommendationDao.getAllRecommendations().first()
-            if (currentData.isEmpty()) {
-                Log.d("FitMe_Debug", "Database empty, seeding from JSON...")
+            
+            // Audit: Cek apakah ada data yang deskripsinya kosong (masalah instruksi tidak muncul)
+            val hasEmptyInstructions = currentData.any { it.description.isBlank() || it.description == "No instructions" }
+
+            if (currentData.isEmpty() || hasEmptyInstructions) {
+                Log.d("FitMe_Debug", "Seeding or Updating database from JSON...")
                 val recommendations = localDataSource.getExercisesFromJson()
                 if (recommendations.isNotEmpty()) {
+                    // Kita timpa data lama agar instruksi yang baru masuk
                     recommendationDao.insertAll(recommendations)
-                    Log.d("FitMe_Debug", "Successfully seeded ${recommendations.size} items from Local JSON")
+                    Log.d("FitMe_Debug", "Successfully seeded/updated ${recommendations.size} items")
                 }
             } else {
-                Log.d("FitMe_Debug", "Database already has ${currentData.size} items, skipping seeding.")
+                Log.d("FitMe_Debug", "Database already has ${currentData.size} valid items.")
             }
         } catch (e: Exception) {
             Log.e("FitMe_Debug", "Seeding Error: ${e.message}")
         }
     }
 
-    // FIXED: Ambil data random LANGSUNG dari Room Database
+    // FIXED: Ambil SEMUA data agar tidak terasa sedikit
     suspend fun getRandomRecommendations(): List<Recommendation> = withContext(Dispatchers.IO) {
         try {
-            // Kita ambil semua dari DB, lalu diacak di level code agar ringan
             val allFromDb = recommendationDao.getAllRecommendations().first()
             if (allFromDb.isNotEmpty()) {
-                return@withContext allFromDb.shuffled().take(15)
+                // Mengambil semua data dan diacak (shuffled)
+                return@withContext allFromDb.shuffled()
             }
             
-            // Jika DB ternyata kosong (misal baru install), coba seeding paksa sekali
             val recommendations = localDataSource.getExercisesFromJson()
             if (recommendations.isNotEmpty()) {
                 recommendationDao.insertAll(recommendations)
-                return@withContext recommendations.shuffled().take(15)
+                return@withContext recommendations.shuffled()
             }
             
             emptyList()
