@@ -68,17 +68,14 @@ fun MainScreen() {
     val currentUser by authViewModel.currentUser.collectAsState()
     val userProfile by authViewModel.userProfile.collectAsState()
 
-    // Sync weight for stats
     LaunchedEffect(userProfile.weight) {
         if (userProfile.weight > 0) {
             runningViewModel.setUserWeight(userProfile.weight)
         }
     }
 
-    // --- PRO FIX: Reactive Navigation System ---
-    // Efek ini mantau state currentUser. Begitu gak null (login sukses), otomatis pindah ke Home.
     LaunchedEffect(currentUser) {
-        if (currentUser != null) {
+        if (currentUser != null && navController.currentDestination?.route == Screen.Login.route) {
             navController.navigate(Screen.Home.route) {
                 popUpTo(Screen.Login.route) { inclusive = true }
                 launchSingleTop = true
@@ -117,7 +114,7 @@ fun MainScreen() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = if (authViewModel.currentUser.value == null) Screen.Login.route else Screen.Home.route,
+            startDestination = if (currentUser == null) Screen.Login.route else Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Login.route) {
@@ -130,10 +127,7 @@ fun MainScreen() {
                     onGoogleLogin = {
                         authViewModel.loginWithGoogle(
                             context = context,
-                            onSuccess = {
-                                // Gak perlu panggil navController.navigate() di sini lagi karena
-                                // LaunchedEffect(currentUser) di atas udah otomatis nanganin hal ini.
-                            },
+                            onSuccess = { /* Di-handle LaunchedEffect */ },
                             onError = { error -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show() }
                         )
                     }
@@ -150,7 +144,6 @@ fun MainScreen() {
             composable(Screen.Home.route) {
                 DashboardScreen(authViewModel, viewModel, recViewModel, runningViewModel,
                     onNavigateToDetail = { id -> navController.navigate(Screen.ExerciseDetail.createRoute(id)) },
-                    onNavigateToAddGym = { navController.navigate("add_gym_session") },
                     onNavigateToSessionDetail = { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) },
                     onNavigateToOnboarding = { navController.navigate("onboarding") }
                 )
@@ -158,6 +151,15 @@ fun MainScreen() {
 
             composable("onboarding") {
                 OnboardingScreen(authViewModel, onComplete = { navController.popBackStack() })
+            }
+
+            composable("add_gym_session") {
+                AddGymSessionScreen(
+                    viewModel = viewModel,
+                    recViewModel = recViewModel,
+                    onNavigateToDetail = { id -> navController.navigate(Screen.ExerciseDetail.createRoute(id)) },
+                    onBack = { navController.popBackStack() }
+                )
             }
 
             composable(Screen.ExerciseDetail.route, arguments = listOf(navArgument("recId") { type = NavType.StringType })) { backStackEntry ->

@@ -29,7 +29,6 @@ import coil.decode.ImageDecoderDecoder
 import com.example.fitme.database.GymSession
 import com.example.fitme.database.Recommendation
 import com.example.fitme.database.RunningSession
-import com.example.fitme.database.WorkoutLog
 import com.example.fitme.viewModel.AuthViewModel
 import com.example.fitme.viewModel.FitMeViewModel
 import com.example.fitme.viewModel.RecommendationViewModel
@@ -45,7 +44,6 @@ fun DashboardScreen(
     recViewModel: RecommendationViewModel,
     runningViewModel: RunningViewModel,
     onNavigateToDetail: (String) -> Unit,
-    onNavigateToAddGym: () -> Unit,
     onNavigateToSessionDetail: (String) -> Unit,
     onNavigateToOnboarding: () -> Unit
 ) {
@@ -65,7 +63,6 @@ fun DashboardScreen(
         else -> "Good Evening"
     }
     
-    // --- CALCULATIONS ---
     val totalWeight = logs.sumOf { it.weight }
     val totalReps = logs.sumOf { it.reps }
     val totalSets = logs.sumOf { it.sets }
@@ -88,27 +85,18 @@ fun DashboardScreen(
         TimeUnit.MILLISECONDS.toMinutes(totalTimeMillis) % 60
     )
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToAddGym,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Session")
-            }
-        }
-    ) { innerPadding ->
+    // Hapus Scaffold & FAB karena sudah ada di Gym Screen
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+    ) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item { Spacer(modifier = Modifier.height(24.dp)) }
 
-            // --- PRO BANNER: PROFILE REMINDER ---
             if (userProfile.weight <= 0 || userProfile.height <= 0) {
                 item {
                     Card(
@@ -147,7 +135,6 @@ fun DashboardScreen(
                 )
             }
 
-            // --- SECTION: STATS CARDS ---
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatsCard(
@@ -175,7 +162,6 @@ fun DashboardScreen(
                 }
             }
 
-            // --- SECTION: RECOMMENDATIONS ---
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -206,7 +192,6 @@ fun DashboardScreen(
                 }
             }
 
-            // --- SECTION: RECENT HISTORY ---
             item {
                 Text("Recent History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
