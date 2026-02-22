@@ -22,6 +22,9 @@ class WorkoutViewModel(
     private val recommendationRepository: IRecommendationRepository
 ) : ViewModel() {
 
+    private val _isDataInitialised = MutableStateFlow(false)
+    val isDataInitialised: StateFlow<Boolean> = _isDataInitialised.asStateFlow()
+
     private val _sessionName = MutableStateFlow("")
     val sessionName = _sessionName.asStateFlow()
 
@@ -83,6 +86,14 @@ class WorkoutViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = 0.0
         )
+
+    init {
+        viewModelScope.launch {
+            gymSessions.collect {
+                _isDataInitialised.value = true
+            }
+        }
+    }
 
     fun updateSessionName(name: String) { _sessionName.value = name }
 

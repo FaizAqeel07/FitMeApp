@@ -221,8 +221,9 @@ fun MainScreen(authViewModel: AuthViewModel) {
                     onNavigateToStats = { navController.navigate(Screen.StatsDetail.route) },
                     onNavigateToAccountSettings = { navController.navigate("account_settings") },
                     onLogout = {
-                        authViewModel.signOut()
-                        navController.navigate(Screen.Login.route) { popUpTo(0) { inclusive = true } }
+                        authViewModel.signOutWithSync(context) {
+                            navController.navigate(Screen.Login.route) { popUpTo(0) { inclusive = true } }
+                        }
                     }
                 )
             }

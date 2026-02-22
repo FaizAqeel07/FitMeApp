@@ -16,6 +16,9 @@ import java.util.Locale
  */
 class RunningViewModel(private val runningRepository: IRunningRepository) : ViewModel() {
 
+    private val _isDataInitialised = MutableStateFlow(false)
+    val isDataInitialised: StateFlow<Boolean> = _isDataInitialised.asStateFlow()
+
     val isTracking: LiveData<Boolean> = TrackingService.isTracking
     val pathPoints = TrackingService.pathPoints
     val distanceInMeters = TrackingService.distanceInMeters
@@ -59,6 +62,11 @@ class RunningViewModel(private val runningRepository: IRunningRepository) : View
         viewModelScope.launch {
             TrackingService.timeRunInMillis.asFlow().collect { millis ->
                 updateRealtimeStats(millis, distanceInMeters.value ?: 0)
+            }
+        }
+        viewModelScope.launch {
+            runningHistory.collect {
+                _isDataInitialised.value = true
             }
         }
     }
