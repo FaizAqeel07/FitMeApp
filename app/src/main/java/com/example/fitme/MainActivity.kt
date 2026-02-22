@@ -44,22 +44,22 @@ fun MainScreen() {
     val workoutDao = database.workoutDao()
     val recommendationDao = database.recommendationDao()
     val gymDao = database.gymDao()
-    
+
     val workoutRepository = WorkoutRepository(workoutDao)
     val recommendationRepository = RecommendationRepository(recommendationDao, workoutDao, context)
     val runningRepository = RunningRepository()
     val gymRepository = GymRepository(gymDao)
-    
+
     val authViewModel: AuthViewModel = viewModel()
-    
+
     val viewModelFactory = FitMeViewModelFactory(
-        workoutRepository, 
-        recommendationRepository, 
-        runningRepository, 
-        gymRepository, 
+        workoutRepository,
+        recommendationRepository,
+        runningRepository,
+        gymRepository,
         context
     )
-    
+
     val viewModel: FitMeViewModel = viewModel(factory = viewModelFactory)
     val recViewModel: RecommendationViewModel = viewModel(factory = viewModelFactory)
     val runningViewModel: RunningViewModel = viewModel(factory = viewModelFactory)
@@ -72,6 +72,17 @@ fun MainScreen() {
     LaunchedEffect(userProfile.weight) {
         if (userProfile.weight > 0) {
             runningViewModel.setUserWeight(userProfile.weight)
+        }
+    }
+
+    // --- PRO FIX: Reactive Navigation System ---
+    // Efek ini mantau state currentUser. Begitu gak null (login sukses), otomatis pindah ke Home.
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            navController.navigate(Screen.Home.route) {
+                popUpTo(Screen.Login.route) { inclusive = true }
+                launchSingleTop = true
+            }
         }
     }
 
@@ -106,22 +117,25 @@ fun MainScreen() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = if (currentUser == null) Screen.Login.route else Screen.Home.route,
+            startDestination = if (authViewModel.currentUser.value == null) Screen.Login.route else Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Login.route) {
                 LoginScreen(
-                    onLoginSuccess = { 
+                    onLoginSuccess = {
                         authViewModel.updateCurrentUser()
                         navController.navigate(Screen.Home.route) { popUpTo(Screen.Login.route) { inclusive = true } }
                     },
                     onNavigateToRegister = { navController.navigate(Screen.Register.route) },
                     onGoogleLogin = {
-                        authViewModel.loginWithGoogle(context, 
+                        authViewModel.loginWithGoogle(
+                            context = context,
+                            onSuccess = {
+                                // Gak perlu panggil navController.navigate() di sini lagi karena
+                                // LaunchedEffect(currentUser) di atas udah otomatis nanganin hal ini.
+                            },
                             onError = { error -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show() }
                         )
-                        // AuthStateListener di ViewModel akan otomatis mendeteksi login
-                        // Kita beri delay kecil untuk memastikan UI menangkap perubahan currentUser
                     }
                 )
             }
@@ -133,13 +147,13 @@ fun MainScreen() {
                 )
             }
 
-            composable(Screen.Home.route) { 
+            composable(Screen.Home.route) {
                 DashboardScreen(authViewModel, viewModel, recViewModel, runningViewModel,
                     onNavigateToDetail = { id -> navController.navigate(Screen.ExerciseDetail.createRoute(id)) },
                     onNavigateToAddGym = { navController.navigate("add_gym_session") },
                     onNavigateToSessionDetail = { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) },
                     onNavigateToOnboarding = { navController.navigate("onboarding") }
-                ) 
+                )
             }
 
             composable("onboarding") {
@@ -158,17 +172,17 @@ fun MainScreen() {
                 GymSessionDetailScreen(id, viewModel, onBack = { navController.popBackStack() })
             }
 
-            composable(Screen.Gym.route) { 
-                GymScreen(viewModel, 
+            composable(Screen.Gym.route) {
+                GymScreen(viewModel,
                     onNavigateToAddSession = { navController.navigate("add_gym_session") },
                     onNavigateToSessionDetail = { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) }
-                ) 
+                )
             }
 
             composable(Screen.Running.route) { RunningScreen(runningViewModel) }
             composable(Screen.StatsDetail.route) { StatsDetailScreen(viewModel, runningViewModel, onBack = { navController.popBackStack() }) }
             composable("account_settings") { AccountSettingsScreen(authViewModel, onBack = { navController.popBackStack() }) }
-            composable(Screen.Profile.route) { 
+            composable(Screen.Profile.route) {
                 ProfileScreen(authViewModel, viewModel, runningViewModel,
                     onNavigateToStats = { navController.navigate(Screen.StatsDetail.route) },
                     onNavigateToAccountSettings = { navController.navigate("account_settings") },

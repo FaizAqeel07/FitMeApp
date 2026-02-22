@@ -3,6 +3,7 @@ package com.example.fitme.viewModel
 import android.content.Context
 import android.util.Log
 import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.ViewModel
@@ -31,7 +32,7 @@ enum class ProfileStatus {
 class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseDatabase.getInstance("https://fitme-87a12-default-rtdb.asia-southeast1.firebasedatabase.app")
-    
+
     private val _currentUser = MutableStateFlow(auth.currentUser)
     val currentUser = _currentUser.asStateFlow()
 
@@ -42,7 +43,6 @@ class AuthViewModel : ViewModel() {
     val profileStatus = _profileStatus.asStateFlow()
 
     init {
-        // PRO LOGIC: Gunakan Listener agar UI selalu sinkron dengan Firebase
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
             _currentUser.value = user
@@ -61,7 +61,7 @@ class AuthViewModel : ViewModel() {
             try {
                 val snapshot = db.getReference("users").child(uid).child("profile").get().await()
                 val profile = snapshot.getValue(UserProfile::class.java)
-                
+
                 if (profile != null && profile.weight > 0 && profile.height > 0) {
                     _userProfile.value = profile
                     _profileStatus.value = ProfileStatus.COMPLETE
@@ -92,7 +92,6 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    // Fungsi manual tetap ada untuk trigger UI jika perlu
     fun updateCurrentUser() {
         _currentUser.value = auth.currentUser
     }
@@ -101,7 +100,7 @@ class AuthViewModel : ViewModel() {
         auth.signOut()
     }
 
-    fun loginWithGoogle(context: Context, onError: (String) -> Unit) {
+    fun loginWithGoogle(context: Context, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val credentialManager = CredentialManager.create(context)
         val webClientId = context.getString(R.string.default_web_client_id)
 
@@ -117,10 +116,17 @@ class AuthViewModel : ViewModel() {
             try {
                 val result = credentialManager.getCredential(context, request)
                 val credential = result.credential
-                if (credential is GoogleIdTokenCredential) {
-                    val firebaseCredential = GoogleAuthProvider.getCredential(credential.idToken, null)
+
+                // --- PRO FIX: Cara parse hasil Google Sign In yang tidak di-skip ---
+                if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                    val firebaseCredential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
+
                     auth.signInWithCredential(firebaseCredential).await()
-                    // AuthStateListener di init akan menghandle sisa alurnya
+                    updateCurrentUser()
+                    onSuccess()
+                } else {
+                    onError("Tipe credential tidak dikenali sistem")
                 }
             } catch (e: Exception) {
                 onError("Gagal Login Google: ${e.message}")
