@@ -25,10 +25,10 @@ import com.example.fitme.repositoryViewModel.RunningRepository
 import com.example.fitme.repositoryViewModel.GymRepository
 import com.example.fitme.ui.theme.FitMeTheme
 import com.example.fitme.viewModel.*
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 1. Install Splash Screen MUST be called before super.onCreate
         val splashScreen = installSplashScreen()
         
         super.onCreate(savedInstanceState)
@@ -37,14 +37,31 @@ class MainActivity : ComponentActivity() {
         setContent {
             val authViewModel: AuthViewModel = viewModel()
             val isReady by authViewModel.isReady.collectAsState()
+            
+            // Tambahkan state tambahan untuk animasi loading di Compose
+            var showLoadingScreen by remember { mutableStateOf(true) }
 
-            // 2. Keep the splash screen on-screen until Auth state is resolved
+            // Splash Screen Sistem akan hilang saat isReady = true
             splashScreen.setKeepOnScreenCondition {
                 !isReady
             }
 
+            // Setelah isReady true, kita beri delay sedikit agar Loading Screen Compose terlihat
+            LaunchedEffect(isReady) {
+                if (isReady) {
+                    delay(1500) // Delay 1.5 detik agar animasi loading terlihat smooth
+                    showLoadingScreen = false
+                }
+            }
+
             FitMeTheme {
-                MainScreen(authViewModel)
+                if (showLoadingScreen) {
+                    // Layar Loading dengan Spinner Neon
+                    SplashScreenLoading()
+                } else {
+                    // Aplikasi Utama
+                    MainScreen(authViewModel)
+                }
             }
         }
     }
@@ -68,7 +85,6 @@ fun MainScreen(authViewModel: AuthViewModel) {
         gymRepository
     )
 
-    // Re-use viewModels with the factory
     val workoutViewModel: WorkoutViewModel = viewModel(factory = viewModelFactory)
     val recommendationViewModel: RecommendationViewModel = viewModel(factory = viewModelFactory)
     val runningViewModel: RunningViewModel = viewModel(factory = viewModelFactory)
