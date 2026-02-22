@@ -1,6 +1,8 @@
 package com.example.fitme.viewModel
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
@@ -31,21 +33,16 @@ enum class ProfileStatus {
     IDLE, LOADING, INCOMPLETE, COMPLETE
 }
 
-/**
- * SOLID: AuthViewModel handles user authentication and profile state.
- */
 class AuthViewModel : ViewModel() {
     private val firebaseAuth = FirebaseAuth.getInstance()
-    
+
     private fun getSafeBuildConfigValue(fieldName: String): String {
         return try {
             val clazz = Class.forName("com.example.fitme.BuildConfig")
             val field: Field = clazz.getField(fieldName)
             val value = field.get(null) as String
-            Log.d("AuthViewModel", "BuildConfig Value for $fieldName: $value")
             value
         } catch (e: Exception) {
-            Log.e("AuthViewModel", "Error reading BuildConfig $fieldName", e)
             ""
         }
     }
@@ -103,7 +100,6 @@ class AuthViewModel : ViewModel() {
                     _profileStatus.value = ProfileStatus.INCOMPLETE
                 }
             } catch (e: Exception) {
-                Log.e("AuthViewModel", "Error fetching profile", e)
                 _profileStatus.value = ProfileStatus.INCOMPLETE
             } finally {
                 _isReady.value = true
@@ -114,7 +110,7 @@ class AuthViewModel : ViewModel() {
     fun saveUserProfile(name: String, weight: Double, height: Double, onResult: (Boolean) -> Unit) {
         val uid = firebaseAuth.currentUser?.uid ?: return
         val profile = UserProfile(name, weight, height)
-        
+
         viewModelScope.launch {
             _isSavingProfile.value = true
             try {
@@ -123,7 +119,6 @@ class AuthViewModel : ViewModel() {
                 _profileStatus.value = ProfileStatus.COMPLETE
                 onResult(true)
             } catch (e: Exception) {
-                Log.e("AuthViewModel", "Error saving profile", e)
                 onResult(false)
             } finally {
                 _isSavingProfile.value = false
@@ -138,7 +133,7 @@ class AuthViewModel : ViewModel() {
     fun signOutWithSync(context: Context, onComplete: () -> Unit) {
         val uid = firebaseAuth.currentUser?.uid
         val currentProfile = _userProfile.value
-        
+
         viewModelScope.launch {
             _isLoggingOut.value = true
             try {
@@ -150,7 +145,6 @@ class AuthViewModel : ViewModel() {
                 credentialManager.clearCredentialState(ClearCredentialStateRequest())
                 onComplete()
             } catch (e: Exception) {
-                Log.e("AuthViewModel", "Error during sign out sync", e)
                 onComplete()
             } finally {
                 _isLoggingOut.value = false
@@ -158,51 +152,20 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    fun loginWithGoogle(context: Context, onError: (String) -> Unit) {
-        val credentialManager = CredentialManager.create(context)
-        
-        // Final Client ID used based on your confirmation
-        val webClientId = "621078401507-h0h0bpcq125hbn4asqr89098d6f8tbpn.apps.googleusercontent.com"
-
-        val googleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
-            .setServerClientId(webClientId)
-            .setAutoSelectEnabled(false) // Keep false to avoid UNAVAILABLE auto-signin helper errors
-            .build()
-
-        val request = GetCredentialRequest.Builder()
-            .addCredentialOption(googleIdOption)
-            .build()
-
+    fun signInWithGoogleToken(idToken: String, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                Log.d("AuthViewModel", "Google Login Call Started. Client ID: $webClientId")
-                val result = credentialManager.getCredential(context, request)
-                val credential = result.credential
+                Log.d("AuthViewModel", "Step 3: Memproses Token dari UI...")
+                val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
+                val authResult = firebaseAuth.signInWithCredential(firebaseCredential).await()
 
-                if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                    val idToken = googleIdTokenCredential.idToken
-                    
-                    if (!idToken.isNullOrEmpty()) {
-                        Log.d("AuthViewModel", "Successfully retrieved Google ID Token")
-                        val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
-                        firebaseAuth.signInWithCredential(firebaseCredential).await()
-                        updateCurrentUser()
-                    } else {
-                        Log.e("AuthViewModel", "Received empty ID token")
-                        onError("Google Token is empty. Check OAuth Consent Screen status.")
-                    }
-                } else {
-                    onError("Unrecognized credential type: ${credential.type}")
-                }
-            } catch (e: GetCredentialException) {
-                Log.e("AuthViewModel", "Credential Manager Exception: ${e.message}", e)
-                onError("Login Cancelled or Failed: ${e.localizedMessage}")
+                Log.d("AuthViewModel", "Step 4: Firebase Auth SUKSES! UID: ${authResult.user?.uid}")
+                updateCurrentUser()
             } catch (e: Exception) {
-                Log.e("AuthViewModel", "General Login Exception", e)
-                onError("Login Error: ${e.localizedMessage}")
+                Log.e("AuthViewModel", "Firebase Error: ${e.message}", e)
+                onError("Gagal masuk ke sistem: ${e.localizedMessage}")
             }
         }
     }
-}
+        }
+

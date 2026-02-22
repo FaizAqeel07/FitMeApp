@@ -150,15 +150,13 @@ fun MainScreen(authViewModel: AuthViewModel) {
                         navController.navigate(Screen.Home.route) { popUpTo(Screen.Login.route) { inclusive = true } }
                     },
                     onNavigateToRegister = { navController.navigate(Screen.Register.route) },
-                    onGoogleLogin = {
-                        authViewModel.loginWithGoogle(
-                            context = context,
-                            onError = { error -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show() }
-                        )
+                    onGoogleLogin = { idToken -> // Terima idToken dari UI
+                        authViewModel.signInWithGoogleToken(idToken, onError = { error ->
+                            Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                        })
                     }
                 )
             }
-
             composable(Screen.Register.route) {
                 RegisterScreen(
                     onRegisterSuccess = { navController.navigate(Screen.Login.route) },
