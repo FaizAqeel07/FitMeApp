@@ -1,22 +1,31 @@
 package com.example.fitme.frontEnd
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.fitme.ui.theme.PrimaryNeon
 import com.example.fitme.viewModel.AuthViewModel
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +41,6 @@ fun AccountSettingsScreen(
     var height by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
 
-    // Inisialisasi data dari Firebase saat profil dimuat
     LaunchedEffect(userProfile) {
         name = userProfile.name
         weight = if (userProfile.weight > 0) userProfile.weight.toString() else ""
@@ -42,79 +50,93 @@ fun AccountSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Account Settings", fontWeight = FontWeight.Bold) },
+                title = { Text("Account Details", fontWeight = FontWeight.ExtraBold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
+        bottomBar = {
+            Button(
                 onClick = {
                     val w = weight.toDoubleOrNull() ?: 0.0
                     val h = height.toDoubleOrNull() ?: 0.0
                     if (name.isBlank()) {
-                        Toast.makeText(context, "Nama tidak boleh kosong", Toast.LENGTH_SHORT).show()
-                        return@ExtendedFloatingActionButton
+                        Toast.makeText(context, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                        return@Button
                     }
                     isSaving = true
                     authViewModel.saveUserProfile(name, w, h) { success ->
                         isSaving = false
                         if (success) {
-                            Toast.makeText(context, "Profil diperbarui!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Profile updated!", Toast.LENGTH_SHORT).show()
                             onBack()
                         } else {
-                            Toast.makeText(context, "Gagal menyimpan data", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Failed to save", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
-                icon = { if (isSaving) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary) else Icon(Icons.Default.Save, null) },
-                text = { Text("Save Profile") }
-            )
+                modifier = Modifier.fillMaxWidth().padding(24.dp).height(56.dp).navigationBarsPadding(),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeon, contentColor = Color.Black)
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.Black)
+                } else {
+                    Text("SAVE CHANGES", fontWeight = FontWeight.Black)
+                }
+            }
         }
     ) { padding ->
         Column(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Full Name") },
-                leadingIcon = { Icon(Icons.Default.Person, null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
+            // PROFILE INPUTS
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("PERSONAL INFO", style = MaterialTheme.typography.labelLarge, color = PrimaryNeon, letterSpacing = 1.sp)
+                
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Display Name") },
+                    leadingIcon = { Icon(Icons.Default.Person, null, tint = PrimaryNeon) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryNeon)
+                )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = weight,
-                    onValueChange = { weight = it },
-                    label = { Text("Weight (kg)") },
-                    leadingIcon = { Icon(Icons.Default.MonitorWeight, null) },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = height,
-                    onValueChange = { height = it },
-                    label = { Text("Height (cm)") },
-                    leadingIcon = { Icon(Icons.Default.Height, null) },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedTextField(
+                        value = weight,
+                        onValueChange = { weight = it },
+                        label = { Text("Weight (kg)") },
+                        leadingIcon = { Icon(Icons.Default.MonitorWeight, null, tint = PrimaryNeon) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryNeon)
+                    )
+                    OutlinedTextField(
+                        value = height,
+                        onValueChange = { height = it },
+                        label = { Text("Height (cm)") },
+                        leadingIcon = { Icon(Icons.Default.Height, null, tint = PrimaryNeon) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryNeon)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // --- BMI Info Card ---
+            // BMI INSIGHT
             val w = weight.toDoubleOrNull() ?: 0.0
             val h = height.toDoubleOrNull() ?: 0.0
             if (w > 0 && h > 0) {
@@ -127,12 +149,25 @@ fun AccountSettingsScreen(
                 }
                 
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("BMI Index: ${String.format("%.1f", bmi)}", fontWeight = FontWeight.Bold)
-                        Text("Status: $status", style = MaterialTheme.typography.bodyMedium)
+                    Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Your BMI Index", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text(String.format(Locale.US, "%.1f", bmi), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                            Text("Category: $status", style = MaterialTheme.typography.bodyMedium, color = PrimaryNeon)
+                        }
+                        Surface(
+                            modifier = Modifier.size(60.dp),
+                            shape = CircleShape,
+                            color = PrimaryNeon.copy(alpha = 0.1f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.MonitorWeight, null, tint = PrimaryNeon)
+                            }
+                        }
                     }
                 }
             }

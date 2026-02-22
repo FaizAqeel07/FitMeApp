@@ -16,6 +16,12 @@
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Jika kamu menggunakan refleksi untuk membaca BuildConfig (seperti di AuthViewModel),
+# aturan ini wajib ada agar field seperti FIREBASE_DATABASE_URL tidak hilang/berubah nama.
+-keep class com.example.fitme.BuildConfig { *; }
+
+# Tambahan: Jika kamu menggunakan Firebase Database, biasanya ProGuard sudah ditangani otomatis oleh SDK,
+# tapi jika ada error terkait parsing data, kamu bisa menambahkan:
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class com.example.fitme.viewModel.UserProfile { *; }

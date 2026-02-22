@@ -1,4 +1,4 @@
-package com.example.fitme.DAO
+package com.example.fitme.dao
 
 import androidx.room.Dao
 import androidx.room.Delete

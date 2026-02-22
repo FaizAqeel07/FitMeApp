@@ -2,6 +2,7 @@ package com.example.fitme.frontEnd
 
 import android.os.Build.VERSION.SDK_INT
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,7 +19,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -31,39 +34,28 @@ import coil.compose.AsyncImage
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import com.example.fitme.database.Recommendation
-import com.example.fitme.viewModel.FitMeViewModel
+import com.example.fitme.ui.theme.PrimaryNeon
+import com.example.fitme.viewModel.WorkoutViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExerciseDetailScreen(
     exercise: Recommendation,
-    viewModel: FitMeViewModel,
+    viewModel: WorkoutViewModel,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     var showLogDialog by remember { mutableStateOf(false) }
     
     val imageLoader = ImageLoader.Builder(context)
-        .components {
-            if (SDK_INT >= 28) add(ImageDecoderDecoder.Factory()) else add(GifDecoder.Factory())
-        }.build()
+        .components { if (SDK_INT >= 28) add(ImageDecoderDecoder.Factory()) else add(GifDecoder.Factory()) }.build()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Exercise Detail", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        },
         bottomBar = {
-            ExerciseDetailBottomBar(
+            ModernExerciseDetailBottomBar(
                 onAddToSession = {
                     viewModel.addExerciseToDraft(exercise.title)
-                    Toast.makeText(context, "${exercise.title} ditambahkan ke sesi", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Added to session", Toast.LENGTH_SHORT).show()
                 },
                 onStartNow = { showLogDialog = true }
             )
@@ -73,27 +65,45 @@ fun ExerciseDetailScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
         ) {
-            ExerciseGifCard(exercise, imageLoader)
-
-            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                Text(
-                    text = exercise.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold
+            // IMMERSIVE HEADER
+            Box(modifier = Modifier.fillMaxWidth().height(350.dp)) {
+                AsyncImage(
+                    model = exercise.gifUrl,
+                    contentDescription = exercise.title,
+                    imageLoader = imageLoader,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
+                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent, Color.Black.copy(alpha = 0.8f)))))
+                IconButton(onClick = onBack, modifier = Modifier.statusBarsPadding().padding(8.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                }
+                Column(modifier = Modifier.align(Alignment.BottomStart).padding(20.dp)) {
+                    Text(
+                        text = exercise.title,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "${exercise.category} • ${exercise.target}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = PrimaryNeon,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                ExerciseStatsCard(exercise)
-
-                Spacer(modifier = Modifier.height(24.dp))
-
+            Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = "Instructions",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    text = "INSTRUCTIONS",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = PrimaryNeon,
+                    letterSpacing = 1.sp
                 )
                 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -101,22 +111,40 @@ fun ExerciseDetailScreen(
                 Text(
                     text = exercise.description,
                     style = MaterialTheme.typography.bodyLarge,
-                    lineHeight = 26.sp,
+                    lineHeight = 28.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                Spacer(modifier = Modifier.height(100.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "EQUIPMENT",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = PrimaryNeon,
+                    letterSpacing = 1.sp
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Layers, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(12.dp))
+                    Text(exercise.equipment, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                
+                Spacer(modifier = Modifier.height(100.dp)) // Padding for bottom bar
             }
         }
     }
 
     if (showLogDialog) {
-        QuickLogDialog(
+        ModernQuickLogDialog(
             exerciseName = exercise.title,
             onDismiss = { showLogDialog = false },
-            onConfirm = { w, r, s ->
-                viewModel.logSingleWorkout(exercise.title, w, r, s) {
-                    Toast.makeText(context, "Workout berhasil dicatat!", Toast.LENGTH_SHORT).show()
+            onConfirm = { weight, reps, sets ->
+                viewModel.logSingleWorkout(exercise.title, weight, reps, sets) {
+                    Toast.makeText(context, "Workout logged!", Toast.LENGTH_SHORT).show()
                     showLogDialog = false
                 }
             }
@@ -125,112 +153,88 @@ fun ExerciseDetailScreen(
 }
 
 @Composable
-fun ExerciseGifCard(exercise: Recommendation, imageLoader: ImageLoader) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 350.dp).background(Color.White),
-            contentAlignment = Alignment.Center
-        ) {
-            if (exercise.gifUrl.isNotEmpty()) {
-                AsyncImage(
-                    model = exercise.gifUrl,
-                    contentDescription = exercise.title,
-                    imageLoader = imageLoader,
-                    modifier = Modifier.fillMaxWidth(),
-                    contentScale = ContentScale.FillWidth
-                )
-            } else {
-                Icon(Icons.Default.FitnessCenter, null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
-            }
-        }
-    }
-}
-
-@Composable
-fun ExerciseStatsCard(exercise: Recommendation) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            DetailIconInfo(Icons.Default.FitnessCenter, "Target", exercise.target)
-            VerticalDivider(modifier = Modifier.height(40.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.2f))
-            DetailIconInfo(Icons.Default.Layers, "Equipment", exercise.equipment)
-        }
-    }
-}
-
-@Composable
-fun ExerciseDetailBottomBar(onAddToSession: () -> Unit, onStartNow: () -> Unit) {
-    Surface(tonalElevation = 8.dp, shadowElevation = 8.dp) {
+fun ModernExerciseDetailBottomBar(onAddToSession: () -> Unit, onStartNow: () -> Unit) {
+    Surface(tonalElevation = 8.dp, shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface) {
         Row(
             modifier = Modifier.padding(16.dp).fillMaxWidth().navigationBarsPadding(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(
                 onClick = onAddToSession,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, SolidColor(PrimaryNeon))
             ) {
-                Icon(Icons.Default.Add, null)
-                Spacer(Modifier.width(4.dp))
-                Text("Add to Session", maxLines = 1)
+                Icon(Icons.Default.Add, null, tint = PrimaryNeon)
+                Spacer(Modifier.width(8.dp))
+                Text("Add to Session", fontWeight = FontWeight.Bold, color = PrimaryNeon)
             }
             
             Button(
                 onClick = onStartNow,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeon, contentColor = Color.Black)
             ) {
                 Icon(Icons.Default.PlayArrow, null)
-                Spacer(Modifier.width(4.dp))
-                Text("Start Now", maxLines = 1)
+                Spacer(Modifier.width(8.dp))
+                Text("Start Now", fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-fun QuickLogDialog(exerciseName: String, onDismiss: () -> Unit, onConfirm: (Double, Int, Int) -> Unit) {
+fun ModernQuickLogDialog(exerciseName: String, onDismiss: () -> Unit, onConfirm: (Double, Int, Int) -> Unit) {
     var weight by remember { mutableStateOf("") }
     var reps by remember { mutableStateOf("") }
     var sets by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Log $exerciseName") },
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = { Text("Log $exerciseName", fontWeight = FontWeight.ExtraBold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = weight, onValueChange = { weight = it }, label = { Text("Weight (kg)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = reps, onValueChange = { reps = it }, label = { Text("Reps") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = sets, onValueChange = { sets = it }, label = { Text("Sets") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = weight, 
+                    onValueChange = { weight = it }, 
+                    label = { Text("Weight (kg)") }, 
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), 
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = reps, 
+                    onValueChange = { reps = it }, 
+                    label = { Text("Reps") }, 
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = sets, 
+                    onValueChange = { sets = it }, 
+                    label = { Text("Sets") }, 
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
             }
         },
         confirmButton = {
-            Button(onClick = {
-                val w = weight.toDoubleOrNull() ?: 0.0
-                val r = reps.toIntOrNull() ?: 0
-                val s = sets.toIntOrNull() ?: 0
-                onConfirm(w, r, s)
-            }) { Text("Save") }
+            Button(
+                onClick = {
+                    val w = weight.toDoubleOrNull() ?: 0.0
+                    val r = reps.toIntOrNull() ?: 0
+                    val s = sets.toIntOrNull() ?: 0
+                    onConfirm(w, r, s)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeon, contentColor = Color.Black)
+            ) { Text("SAVE", fontWeight = FontWeight.Bold) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("CANCEL", color = Color.Gray) }
+        }
     )
-}
-
-@Composable
-fun DetailIconInfo(icon: ImageVector, label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(130.dp)) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 2)
-    }
 }

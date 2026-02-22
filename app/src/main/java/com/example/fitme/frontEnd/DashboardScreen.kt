@@ -1,6 +1,5 @@
 package com.example.fitme.frontEnd
 
-import android.os.Build.VERSION.SDK_INT
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,316 +17,194 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.ImageLoader
 import coil.compose.AsyncImage
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
-import com.example.fitme.database.GymSession
+import com.example.fitme.R
 import com.example.fitme.database.Recommendation
-import com.example.fitme.database.RunningSession
-import com.example.fitme.viewModel.AuthViewModel
-import com.example.fitme.viewModel.FitMeViewModel
-import com.example.fitme.viewModel.RecommendationViewModel
-import com.example.fitme.viewModel.RunningViewModel
-import java.text.SimpleDateFormat
+import com.example.fitme.ui.theme.PrimaryNeon
+import com.example.fitme.viewModel.*
 import java.util.*
-import java.util.concurrent.TimeUnit
 
 @Composable
 fun DashboardScreen(
     authViewModel: AuthViewModel,
-    viewModel: FitMeViewModel,
-    recViewModel: RecommendationViewModel,
-    runningViewModel: RunningViewModel,
+    dashboardViewModel: DashboardViewModel,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSessionDetail: (String) -> Unit,
-    onNavigateToOnboarding: () -> Unit
+    onNavigateToOnboarding: () -> Unit,
+    onNavigateToRunningHistory: () -> Unit = {} // Added for fine-tuning
 ) {
     val userProfile by authViewModel.userProfile.collectAsState()
-    val logs by viewModel.allWorkouts.collectAsState()
-    val gymSessions by viewModel.gymSessions.collectAsState()
-    val recommendations by recViewModel.recommendedExercises.collectAsState()
-    val runningHistory by runningViewModel.runningHistory.collectAsState()
-    val isLoading by recViewModel.isLoading.collectAsState()
     
-    var showAllRecommendations by remember { mutableStateOf(false) }
+    val greeting by dashboardViewModel.greeting.collectAsState()
+    val combinedHistory by dashboardViewModel.combinedHistory.collectAsState()
+    val totalDurationStr by dashboardViewModel.totalDurationStr.collectAsState()
+    val totalVolume by dashboardViewModel.totalVolume.collectAsState()
+    val totalKm by dashboardViewModel.totalDistanceKm.collectAsState()
     
-    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    val greeting = when(hour) {
-        in 0..11 -> "Good Morning"
-        in 12..15 -> "Good Afternoon"
-        else -> "Good Evening"
-    }
+    val recommendations by dashboardViewModel.displayedRecommendations.collectAsState()
+    val isRecLoading by dashboardViewModel.isRecLoading.collectAsState()
+    val showAllRecommendations by dashboardViewModel.showAllRecommendations.collectAsState()
     
-    val totalWeight = logs.sumOf { it.weight }
-    val totalReps = logs.sumOf { it.reps }
-    val totalSets = logs.sumOf { it.sets }
-    val totalVolume = logs.sumOf { it.volume }
+    val gifImageLoader = rememberGifImageLoader()
 
-    val totalKm = runningHistory.sumOf { it.distanceKm }
-    val totalCalories = runningHistory.sumOf { it.caloriesBurned }
-    val totalTimeMillis = runningHistory.sumOf { it.durationMillis }
-    
-    val avgPace = if (totalKm > 0) {
-        val totalMinutes = (totalTimeMillis / 1000.0) / 60.0
-        val pace = totalMinutes / totalKm
-        val mins = pace.toInt()
-        val secs = ((pace - mins) * 60).toInt()
-        "$mins:${if (secs < 10) "0" else ""}$secs"
-    } else "--"
-
-    val totalDurationStr = String.format("%dh %02dm", 
-        TimeUnit.MILLISECONDS.toHours(totalTimeMillis),
-        TimeUnit.MILLISECONDS.toMinutes(totalTimeMillis) % 60
-    )
-
-    // Hapus Scaffold & FAB karena sudah ada di Gym Screen
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(24.dp)) }
+        item { Spacer(modifier = Modifier.statusBarsPadding()) }
 
-            if (userProfile.weight <= 0 || userProfile.height <= 0) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("Profile Incomplete", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                                Text("Set your weight and height for accurate tracking.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f))
-                            }
-                            Button(
-                                onClick = onNavigateToOnboarding,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("Fix Now", fontSize = 12.sp)
-                            }
-                        }
-                    }
+        item {
+            Column {
+                Text(greeting, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
+                Text(stringResource(R.string.ready_to_crush_goals), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        if (userProfile.weight <= 0 || userProfile.height <= 0) {
+            item { IncompleteProfileBanner(onNavigateToOnboarding) }
+        }
+
+        item { DashboardStatsSummary(totalVolume, totalKm, totalDurationStr) }
+
+        item {
+            DashboardSectionHeader(
+                title = stringResource(R.string.recommended_for_you),
+                showSeeAll = true, // Simplified, logic handled in VM
+                onSeeAll = { dashboardViewModel.toggleRecommendations() },
+                seeAllText = if (showAllRecommendations) "Show Less" else "See All"
+            )
+        }
+
+        if (recommendations.isEmpty() && !isRecLoading) {
+            item {
+                Button(onClick = { dashboardViewModel.fetchDashboardRecommendations() }) {
+                    Text(stringResource(R.string.get_recommendations))
                 }
             }
-
-            item {
-                Text(
-                    text = greeting,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
+        } else {
+            items(recommendations, key = { it.id }) { workout ->
+                ModernRecommendedWorkoutCard(workout, gifImageLoader) { onNavigateToDetail(workout.id) }
             }
+        }
 
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatsCard(
-                        title = "Gym Progress",
-                        icon = Icons.Default.FitnessCenter,
-                        containerColor = Color(0xFF2E4B1F),
-                        stats = listOf(
-                            "Kg" to "$totalWeight",
-                            "Sets" to "$totalSets",
-                            "Reps" to "$totalReps",
-                            "Vol" to "${totalVolume.toInt()}"
+        item { DashboardSectionHeader(stringResource(R.string.recent_history), false) {} }
+
+        if (combinedHistory.isEmpty()) {
+            item { Text(stringResource(R.string.no_activity_recorded), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            items(combinedHistory) { historyItem ->
+                when (historyItem) {
+                    is HistoryItem.Gym -> {
+                        ModernHistoryCard(
+                            icon = Icons.Default.FitnessCenter,
+                            title = historyItem.session.sessionName,
+                            subtitle = "${historyItem.session.exercises.size} Exercises",
+                            value = "${historyItem.session.totalVolume.toInt()} kg",
+                            onClick = { onNavigateToSessionDetail(historyItem.session.id) }
                         )
-                    )
-                    StatsCard(
-                        title = "Running Journey",
-                        icon = Icons.AutoMirrored.Filled.DirectionsRun,
-                        containerColor = Color(0xFF1A3A5F),
-                        stats = listOf(
-                            "KM" to String.format("%.2f", totalKm),
-                            "Pace" to avgPace,
-                            "Time" to totalDurationStr,
-                            "Kcal" to "$totalCalories"
+                    }
+                    is HistoryItem.Run -> {
+                        ModernHistoryCard(
+                            icon = Icons.AutoMirrored.Filled.DirectionsRun,
+                            title = "Morning Run",
+                            subtitle = "Pace: ${historyItem.session.averagePace}",
+                            value = "${String.format(Locale.US, "%.1f", historyItem.session.distanceKm)} km",
+                            onClick = onNavigateToRunningHistory // Fine-tuned: Added click action
                         )
-                    )
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Recommended for you", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (recommendations.size > 3) {
-                        TextButton(onClick = { showAllRecommendations = !showAllRecommendations }) {
-                            Text(if (showAllRecommendations) "See Less" else "See All")
-                        }
                     }
                 }
             }
-
-            if (recommendations.isEmpty() && !isLoading) {
-                item {
-                    Button(onClick = { recViewModel.fetchDashboardRecommendations() }) {
-                        Text("Refresh Recommendations")
-                    }
-                }
-            } else {
-                val displayedRecs = if (showAllRecommendations) recommendations else recommendations.take(3)
-                items(displayedRecs) { workout ->
-                    RecommendedWorkoutCard(workout = workout) {
-                        onNavigateToDetail(workout.id)
-                    }
-                }
-            }
-
-            item {
-                Text("Recent History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-
-            val combinedHistory = (gymSessions.map { "gym" to it } + runningHistory.map { "run" to it })
-                .sortedByDescending { 
-                    if (it.second is GymSession) (it.second as GymSession).date 
-                    else (it.second as RunningSession).startTime 
-                }
-                .take(6)
-
-            if (combinedHistory.isEmpty()) {
-                item {
-                    Text("No activity yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                items(combinedHistory) { item ->
-                    if (item.first == "gym") {
-                        GymSessionHistoryCard(item.second as GymSession) {
-                            onNavigateToSessionDetail((item.second as GymSession).id)
-                        }
-                    } else {
-                        RunningHistoryCard(item.second as RunningSession)
-                    }
-                }
-            }
-            
-            item { Spacer(modifier = Modifier.height(24.dp)) }
         }
     }
 }
 
 @Composable
-fun GymSessionHistoryCard(session: GymSession, onClick: () -> Unit) {
-    val dateStr = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(session.date))
+private fun IncompleteProfileBanner(onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) { Icon(Icons.Default.FitnessCenter, null, tint = MaterialTheme.colorScheme.secondary) }
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(session.sessionName, fontWeight = FontWeight.Bold)
-                Text("$dateStr • ${session.exercises.size} Exercises", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.profile_incomplete), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.profile_incomplete_subtitle), fontSize = 12.sp)
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("${session.totalVolume.toInt()}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Text("Kg Vol", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-            }
-        }
-    }
-}
-
-@Composable
-fun StatsCard(title: String, icon: ImageVector, containerColor: Color, stats: List<Pair<String, String>>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(title, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
-            }
-            Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                stats.forEach { (label, value) ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(label, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
-                        Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    }
-                }
+            Button(onClick = onClick, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                Text(stringResource(R.string.fix_now), fontSize = 12.sp)
             }
         }
     }
 }
 
 @Composable
-fun RunningHistoryCard(session: RunningSession) {
-    val dateStr = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date(session.startTime))
+private fun DashboardStatsSummary(volume: Double, km: Double, time: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) { Icon(Icons.AutoMirrored.Filled.DirectionsRun, null, tint = MaterialTheme.colorScheme.primary) }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Run: ${String.format("%.2f", session.distanceKm)} km", fontWeight = FontWeight.Bold)
-                Text("$dateStr • Pace: ${session.averagePace}", style = MaterialTheme.typography.bodySmall)
-            }
-            Text("${session.caloriesBurned} Kcal", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color(0xFFE57373))
+        Row(Modifier.padding(24.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+            StatItem(Icons.Default.FitnessCenter, "${volume.toInt()}kg", "Volume")
+            StatItem(Icons.AutoMirrored.Filled.DirectionsRun, "${String.format(Locale.US, "%.1f", km)}km", "Distance")
+            StatItem(Icons.Default.Timer, time, "Time")
         }
     }
 }
 
 @Composable
-fun RecommendedWorkoutCard(workout: Recommendation, onClick: () -> Unit) {
-    val context = LocalContext.current
-    val imageLoader = remember {
-        ImageLoader.Builder(context).components {
-            if (SDK_INT >= 28) add(ImageDecoderDecoder.Factory()) else add(GifDecoder.Factory())
-        }.build()
+private fun StatItem(icon: ImageVector, value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, null, tint = PrimaryNeon, modifier = Modifier.size(24.dp))
+        Text(value, fontWeight = FontWeight.Black, fontSize = 18.sp)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
     }
+}
+
+@Composable
+private fun DashboardSectionHeader(
+    title: String, 
+    showSeeAll: Boolean, 
+    seeAllText: String = "See All",
+    onSeeAll: () -> Unit
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        if (showSeeAll) TextButton(onClick = onSeeAll) { Text(seeAllText, color = PrimaryNeon) }
+    }
+}
+
+@Composable
+private fun ModernRecommendedWorkoutCard(workout: Recommendation, imageLoader: coil.ImageLoader, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
     ) {
-        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
                 model = workout.gifUrl,
                 contentDescription = null,
                 imageLoader = imageLoader,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+                modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp))
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(workout.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                Text("${workout.category} • ${workout.target}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(workout.title, fontWeight = FontWeight.Bold)
+                Text("${workout.category} • ${workout.target}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
+            Icon(Icons.Default.ChevronRight, null, tint = Color.Gray)
         }
     }
 }

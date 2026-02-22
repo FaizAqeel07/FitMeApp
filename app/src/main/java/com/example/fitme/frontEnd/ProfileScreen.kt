@@ -25,8 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.fitme.ui.theme.PrimaryNeon
 import com.example.fitme.viewModel.AuthViewModel
-import com.example.fitme.viewModel.FitMeViewModel
+import com.example.fitme.viewModel.WorkoutViewModel
 import com.example.fitme.viewModel.RunningViewModel
 import com.google.firebase.auth.FirebaseAuth
 import java.util.Locale
@@ -35,7 +36,7 @@ import java.util.Locale
 @Composable
 fun ProfileScreen(
     authViewModel: AuthViewModel,
-    viewModel: FitMeViewModel,
+    viewModel: WorkoutViewModel,
     runningViewModel: RunningViewModel,
     onNavigateToStats: () -> Unit,
     onNavigateToAccountSettings: () -> Unit,
@@ -43,134 +44,133 @@ fun ProfileScreen(
 ) {
     val auth = FirebaseAuth.getInstance()
     val user = auth.currentUser
-    
-    // Collect profile data from AuthViewModel
     val userProfile by authViewModel.userProfile.collectAsState()
     val gymSessions by viewModel.gymSessions.collectAsState()
     val runningHistory by runningViewModel.runningHistory.collectAsState()
 
-    // Logic for Display Name
-    val displayName = when {
-        userProfile.name.isNotBlank() -> userProfile.name
-        !user?.displayName.isNullOrBlank() -> user?.displayName!!
-        else -> user?.email ?: "User"
-    }
-
+    val displayName = userProfile.name.ifBlank { user?.displayName ?: user?.email ?: "Athlete" }
     val totalGymVolume = gymSessions.sumOf { it.totalVolume }
     val totalRunDistance = runningHistory.sumOf { it.distanceKm }
-    val totalActivities = gymSessions.size + runningHistory.size
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("My Profile", fontWeight = FontWeight.Bold) }
+                title = { Text("PROFILE", fontWeight = FontWeight.Black, letterSpacing = 2.sp) },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // --- HEADER SECTION (Avatar & Name) ---
+            // AVATAR SECTION
             Box(
                 modifier = Modifier
-                    .size(100.dp)
+                    .size(120.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (user?.photoUrl != null) {
                     AsyncImage(
                         model = user.photoUrl,
-                        contentDescription = "Profile Picture",
+                        contentDescription = null,
                         modifier = Modifier.fillMaxSize().clip(CircleShape),
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Icon(Icons.Default.Person, null, modifier = Modifier.size(60.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Icon(Icons.Default.Person, null, modifier = Modifier.size(60.dp), tint = PrimaryNeon)
                 }
             }
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Text(text = displayName, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+            Text(text = user?.email ?: "", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // STATS ROW
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ProfileStatCard(Modifier.weight(1f), "GYM VOL", "${totalGymVolume.toInt()}", "kg", Icons.Default.FitnessCenter)
+                ProfileStatCard(Modifier.weight(1f), "RUNNING", String.format("%.1f", totalRunDistance), "km", Icons.AutoMirrored.Filled.DirectionsRun)
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // MENU SECTION
+            Text(
+                "ACCOUNT SETTINGS", 
+                modifier = Modifier.fillMaxWidth().padding(start = 4.dp), 
+                style = MaterialTheme.typography.labelLarge, 
+                color = PrimaryNeon,
+                letterSpacing = 1.sp
+            )
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            Text(
-                text = displayName, 
-                style = MaterialTheme.typography.headlineSmall, 
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = user?.email ?: "", 
-                style = MaterialTheme.typography.bodySmall, 
-                color = Color.Gray
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // --- STATS SECTION ---
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Activity Summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                TextButton(onClick = onNavigateToStats) {
-                    Text("Details", style = MaterialTheme.typography.labelLarge)
-                    Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(16.dp))
-                }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            ) {
+                ProfileMenuRow(Icons.Default.Settings, "Account Details", onClick = onNavigateToAccountSettings)
+                ProfileMenuRow(Icons.Default.BarChart, "View All Statistics", onClick = onNavigateToStats)
+                ProfileMenuRow(Icons.Default.Notifications, "Notifications") {}
+                ProfileMenuRow(Icons.AutoMirrored.Filled.Logout, "Sign Out", isError = true, onClick = onLogout)
             }
             
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Row(modifier = Modifier.fillMaxWidth().clickable { onNavigateToStats() }, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(Modifier.weight(1f), "Gym Vol", String.format(Locale.US, "%.0f", totalGymVolume), "kg", Icons.Default.FitnessCenter, Color(0xFF4CAF50))
-                StatCard(Modifier.weight(1f), "Running", String.format(Locale.US, "%.1f", totalRunDistance), "km", Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFF2196F3))
-                StatCard(Modifier.weight(1f), "Total", totalActivities.toString(), "acts", Icons.Default.History, Color(0xFFFF9800))
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // --- SETTINGS SECTION ---
-            Text("Settings", modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
-                Column {
-                    MenuRow(Icons.Default.Settings, "Account Settings", onClick = onNavigateToAccountSettings)
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
-                    MenuRow(Icons.Default.Notifications, "Notifications") {}
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
-                    MenuRow(Icons.Default.Security, "Privacy & Security") {}
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
-                    MenuRow(icon = Icons.AutoMirrored.Filled.Logout, title = "Logout", isError = true, onClick = onLogout)
-                }
-            }
             Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
 
 @Composable
-fun StatCard(modifier: Modifier = Modifier, label: String, value: String, unit: String, icon: ImageVector, color: Color) {
-    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))) {
-        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = value, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = color)
-            Text(text = "$label ($unit)", fontSize = 10.sp, color = Color.Gray)
+fun ProfileStatCard(modifier: Modifier, label: String, value: String, unit: String, icon: ImageVector) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, null, tint = PrimaryNeon, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(text = value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+            Text(text = "$label ($unit)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
         }
     }
 }
 
 @Composable
-fun MenuRow(icon: ImageVector, title: String, isError: Boolean = false, onClick: () -> Unit) {
-    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentPadding = PaddingValues(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Icon(icon, null, tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(text = title, style = MaterialTheme.typography.bodyLarge, color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, null, tint = Color.LightGray, modifier = Modifier.size(20.dp))
-        }
+fun ProfileMenuRow(icon: ImageVector, title: String, isError: Boolean = false, onClick: () -> Unit = {}) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon, 
+            null, 
+            tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(20.dp))
+        Text(
+            text = title, 
+            style = MaterialTheme.typography.bodyLarge, 
+            fontWeight = FontWeight.Bold,
+            color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(Icons.Default.ChevronRight, null, tint = Color.Gray.copy(alpha = 0.5f))
     }
 }

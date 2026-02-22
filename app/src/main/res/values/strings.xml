@@ -1,5 +1,11 @@
 <resources>
     <string name="app_name">FitMe</string>
-    <!-- Replace with your actual Web Client ID from Firebase Console / Google Cloud Console -->
-    <string name="default_web_client_id">621078401507-h0h0bpcq125hbn4asqr89098d6f8tbpn.apps.googleusercontent.com</string>
+    <string name="ready_to_crush_goals">Ready to crush your goals?</string>
+    <string name="recommended_for_you">Recommended For You</string>
+    <string name="get_recommendations">Get Recommendations</string>
+    <string name="recent_history">Recent History</string>
+    <string name="no_activity_recorded">No activity recorded yet.</string>
+    <string name="profile_incomplete">Profile Incomplete</string>
+    <string name="profile_incomplete_subtitle">Set weight and height for accurate stats.</string>
+    <string name="fix_now">Fix Now</string>
 </resources>

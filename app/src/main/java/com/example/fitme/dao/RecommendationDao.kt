@@ -1,4 +1,4 @@
-package com.example.fitme.DAO
+package com.example.fitme.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -21,7 +21,14 @@ interface RecommendationDao {
     @Query("DELETE FROM recommendations")
     suspend fun clearAll()
 
-    // Search query for Local JSON data in Room
-    @Query("SELECT * FROM recommendations WHERE title LIKE '%' || :query || '%' OR target LIKE '%' || :query || '%'")
+    @Query("SELECT COUNT(*) FROM recommendations")
+    suspend fun getCount(): Int
+
+    // Optimization: Use SQL for randomization and limit results
+    @Query("SELECT * FROM recommendations ORDER BY RANDOM() LIMIT :limit")
+    suspend fun getRandomRecommendations(limit: Int): List<Recommendation>
+
+    // Search query for Local JSON data in Room with limit
+    @Query("SELECT * FROM recommendations WHERE title LIKE '%' || :query || '%' OR target LIKE '%' || :query || '%' LIMIT 20")
     suspend fun searchExercises(query: String): List<Recommendation>
 }

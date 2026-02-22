@@ -5,9 +5,9 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.example.fitme.DAO.GymDao
-import com.example.fitme.DAO.RecommendationDao
-import com.example.fitme.DAO.WorkoutDao
+import com.example.fitme.dao.GymDao
+import com.example.fitme.dao.RecommendationDao
+import com.example.fitme.dao.WorkoutDao
 
 @Database(
     entities = [WorkoutLog::class, Recommendation::class, GymSession::class, Gym::class], 

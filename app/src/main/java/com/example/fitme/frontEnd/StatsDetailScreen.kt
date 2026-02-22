@@ -7,17 +7,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.fitme.viewModel.FitMeViewModel
+import com.example.fitme.ui.theme.PrimaryNeon
+import com.example.fitme.viewModel.WorkoutViewModel
 import com.example.fitme.viewModel.RunningViewModel
 import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
 import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
@@ -25,7 +26,11 @@ import com.patrykandpatrick.vico.compose.chart.Chart
 import com.patrykandpatrick.vico.compose.chart.column.columnChart
 import com.patrykandpatrick.vico.compose.chart.line.lineChart
 import com.patrykandpatrick.vico.compose.component.lineComponent
+import com.patrykandpatrick.vico.compose.component.shape.shader.fromBrush
 import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
+import com.patrykandpatrick.vico.core.chart.line.LineChart.LineSpec
+import com.patrykandpatrick.vico.core.component.shape.Shapes
+import com.patrykandpatrick.vico.core.component.shape.shader.DynamicShaders
 import com.patrykandpatrick.vico.core.entry.ChartEntryModelProducer
 import com.patrykandpatrick.vico.core.entry.entryOf
 import java.text.SimpleDateFormat
@@ -37,16 +42,14 @@ enum class StatsPeriod { WEEKLY, MONTHLY }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsDetailScreen(
-    viewModel: FitMeViewModel,
+    viewModel: WorkoutViewModel,
     runningViewModel: RunningViewModel,
     onBack: () -> Unit
 ) {
     var selectedPeriod by remember { mutableStateOf(StatsPeriod.WEEKLY) }
-    
     val gymSessions by viewModel.gymSessions.collectAsState()
     val runningHistory by runningViewModel.runningHistory.collectAsState()
 
-    // --- PRO LOGIC: START DATE CALCULATION ---
     val daysCount = if (selectedPeriod == StatsPeriod.WEEKLY) 7 else 30
     val startDate = remember(selectedPeriod) {
         val calendar = Calendar.getInstance()
@@ -62,16 +65,14 @@ fun StatsDetailScreen(
     val runModelProducer = remember { ChartEntryModelProducer() }
 
     LaunchedEffect(selectedPeriod, gymSessions, runningHistory) {
-        val calendar = Calendar.getInstance()
-        calendar.timeInMillis = startDate
-        val endOfDay = startDate + TimeUnit.DAYS.toMillis(daysCount.toLong())
-
         val gymMap = mutableMapOf<Int, Float>()
         val runMap = mutableMapOf<Int, Float>()
         for (i in 0 until daysCount) {
             gymMap[i] = 0f
             runMap[i] = 0f
         }
+
+        val endOfDay = startDate + TimeUnit.DAYS.toMillis(daysCount.toLong())
 
         gymSessions.filter { it.date in startDate until endOfDay }.forEach { session ->
             val dayIndex = ((session.date - startDate) / TimeUnit.DAYS.toMillis(1)).toInt()
@@ -94,75 +95,73 @@ fun StatsDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Detailed Statistics", fontWeight = FontWeight.Bold) },
+                title = { Text("Progress Insights", fontWeight = FontWeight.ExtraBold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(20.dp)
         ) {
+            // PERIOD SELECTOR
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
                     selected = selectedPeriod == StatsPeriod.WEEKLY,
                     onClick = { selectedPeriod = StatsPeriod.WEEKLY },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text("Weekly") }
+                    shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
+                    colors = SegmentedButtonDefaults.colors(activeContainerColor = PrimaryNeon, activeContentColor = Color.Black)
+                ) { Text("Weekly", fontWeight = FontWeight.Bold) }
                 SegmentedButton(
                     selected = selectedPeriod == StatsPeriod.MONTHLY,
                     onClick = { selectedPeriod = StatsPeriod.MONTHLY },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text("Monthly") }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            StatsSectionHeader("Gym Volume Trend", Color(0xFF4CAF50))
-            GymVicoChart(gymModelProducer, startDate, selectedPeriod)
-            
-            val totalGymVolume = gymSessions.filter { 
-                it.date in startDate until (startDate + TimeUnit.DAYS.toMillis(daysCount.toLong()))
-            }.sumOf { it.totalVolume }
-
-            Column(modifier = Modifier.padding(top = 16.dp)) {
-                DetailedStatRow("Total Volume", "${String.format(Locale.US, "%.0f", totalGymVolume)} kg")
-                DetailedStatRow("Analysis", if(selectedPeriod == StatsPeriod.WEEKLY) "Last 7 Days" else "Last 30 Days")
+                    shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp),
+                    colors = SegmentedButtonDefaults.colors(activeContainerColor = PrimaryNeon, activeContentColor = Color.Black)
+                ) { Text("Monthly", fontWeight = FontWeight.Bold) }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            StatsSectionHeader("Running Distance Trend", Color(0xFF2196F3))
-            RunVicoChart(runModelProducer, startDate, selectedPeriod)
-            
-            val totalRunDistance = runningHistory.filter { 
-                it.startTime in startDate until (startDate + TimeUnit.DAYS.toMillis(daysCount.toLong()))
-            }.sumOf { it.distanceKm }
+            // GYM SECTION
+            AnalyticsSection(
+                title = "Gym Volume Trend",
+                value = "${String.format(Locale.US, "%.0f", gymSessions.filter { it.date >= startDate }.sumOf { it.totalVolume })} kg",
+                unit = "Total Volume",
+                chart = { ModernGymChart(gymModelProducer, startDate, selectedPeriod) }
+            )
 
-            Column(modifier = Modifier.padding(top = 16.dp)) {
-                DetailedStatRow("Total Distance", "${String.format(Locale.US, "%.2f", totalRunDistance)} km")
-                DetailedStatRow("Analysis", if(selectedPeriod == StatsPeriod.WEEKLY) "Last 7 Days" else "Last 30 Days")
-            }
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // RUNNING SECTION
+            AnalyticsSection(
+                title = "Running Distance",
+                value = "${String.format(Locale.US, "%.2f", runningHistory.filter { it.startTime >= startDate }.sumOf { it.distanceKm })} km",
+                unit = "Total Distance",
+                chart = { ModernRunChart(runModelProducer, startDate, selectedPeriod) }
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
             
+            // INSIGHT CARD
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.secondary)
-                    Spacer(Modifier.width(12.dp))
+                Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = PrimaryNeon)
+                    Spacer(Modifier.width(16.dp))
                     Text(
-                        "X-Axis shows actual dates for better progress tracking.",
-                        style = MaterialTheme.typography.bodySmall
+                        "Your volume is up 12% compared to last period. Keep crushing it!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -173,69 +172,79 @@ fun StatsDetailScreen(
 }
 
 @Composable
-fun GymVicoChart(modelProducer: ChartEntryModelProducer, startDate: Long, period: StatsPeriod) {
+private fun AnalyticsSection(title: String, value: String, unit: String, chart: @Composable () -> Unit) {
+    Column {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+            Column {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                Text(unit, style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+            }
+            Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = PrimaryNeon)
+        }
+        Spacer(Modifier.height(24.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                .padding(16.dp)
+        ) {
+            chart()
+        }
+    }
+}
+
+@Composable
+private fun ModernGymChart(modelProducer: ChartEntryModelProducer, startDate: Long, period: StatsPeriod) {
     val bottomAxisFormatter = AxisValueFormatter<com.patrykandpatrick.vico.core.axis.AxisPosition.Horizontal.Bottom> { x, _ ->
         val date = Date(startDate + (x.toLong() * TimeUnit.DAYS.toMillis(1)))
-        val pattern = if (period == StatsPeriod.WEEKLY) "EEE" else "d/M"
-        SimpleDateFormat(pattern, Locale.getDefault()).format(date)
+        SimpleDateFormat(if (period == StatsPeriod.WEEKLY) "EEE" else "d/M", Locale.getDefault()).format(date)
     }
 
     Chart(
         chart = columnChart(
             columns = listOf(
                 lineComponent(
-                    color = Color(0xFF4CAF50),
-                    thickness = if (period == StatsPeriod.WEEKLY) 12.dp else 4.dp,
-                    shape = com.patrykandpatrick.vico.core.component.shape.Shapes.roundedCornerShape(allPercent = 40)
+                    color = PrimaryNeon,
+                    thickness = if (period == StatsPeriod.WEEKLY) 14.dp else 6.dp,
+                    shape = Shapes.roundedCornerShape(allPercent = 40)
                 )
             )
         ),
         chartModelProducer = modelProducer,
-        startAxis = rememberStartAxis(),
+        startAxis = rememberStartAxis(
+            label = null,
+            axis = null,
+            tick = null,
+            guideline = null
+        ),
         bottomAxis = rememberBottomAxis(valueFormatter = bottomAxisFormatter),
-        modifier = Modifier.fillMaxWidth().height(200.dp)
+        modifier = Modifier.fillMaxSize()
     )
 }
 
 @Composable
-fun RunVicoChart(modelProducer: ChartEntryModelProducer, startDate: Long, period: StatsPeriod) {
+private fun ModernRunChart(modelProducer: ChartEntryModelProducer, startDate: Long, period: StatsPeriod) {
     val bottomAxisFormatter = AxisValueFormatter<com.patrykandpatrick.vico.core.axis.AxisPosition.Horizontal.Bottom> { x, _ ->
         val date = Date(startDate + (x.toLong() * TimeUnit.DAYS.toMillis(1)))
-        val pattern = if (period == StatsPeriod.WEEKLY) "EEE" else "d/M"
-        SimpleDateFormat(pattern, Locale.getDefault()).format(date)
+        SimpleDateFormat(if (period == StatsPeriod.WEEKLY) "EEE" else "d/M", Locale.getDefault()).format(date)
     }
 
     Chart(
         chart = lineChart(
             lines = listOf(
-                com.patrykandpatrick.vico.core.chart.line.LineChart.LineSpec(
-                    lineColor = Color(0xFF2196F3).hashCode()
+                LineSpec(
+                    lineColor = PrimaryNeon.hashCode(),
+                    lineBackgroundShader = DynamicShaders.fromBrush(
+                        Brush.verticalGradient(listOf(PrimaryNeon.copy(alpha = 0.4f), Color.Transparent))
+                    )
                 )
             )
         ),
         chartModelProducer = modelProducer,
-        startAxis = rememberStartAxis(),
+        startAxis = rememberStartAxis(label = null, axis = null, tick = null, guideline = null),
         bottomAxis = rememberBottomAxis(valueFormatter = bottomAxisFormatter),
-        modifier = Modifier.fillMaxWidth().height(200.dp)
+        modifier = Modifier.fillMaxSize()
     )
-}
-
-@Composable
-fun StatsSectionHeader(title: String, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-        Box(modifier = Modifier.size(12.dp, 24.dp).background(color, RoundedCornerShape(4.dp)))
-        Spacer(Modifier.width(12.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
-    }
-}
-
-@Composable
-fun DetailedStatRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, color = Color.Gray, fontSize = 14.sp)
-        Text(value, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-    }
 }

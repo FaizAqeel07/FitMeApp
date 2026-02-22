@@ -1,11 +1,19 @@
 import org.gradle.api.JavaVersion
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.gms.google.services)
+}
+
+// Security: Load properties from local.properties (Not committed to Git)
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
 }
 
 android {
@@ -20,11 +28,15 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Security: Define BuildConfig fields from local.properties
+        buildConfigField("String", "FIREBASE_DATABASE_URL", "\"${localProperties.getProperty("firebase.database.url") ?: "https://fallback-url.com"}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProperties.getProperty("google.web.client.id") ?: "default_client_id"}\"")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true // Security: Enable ProGuard/R8
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -43,7 +55,6 @@ android {
     }
 }
 
-// Cara modern dan aman untuk mengatur jvmTarget
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_11)
@@ -70,7 +81,6 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.kotlinx.coroutines.play.services)
     
-    // Coil untuk GIF & Image Loading
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
 
@@ -82,36 +92,19 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     
-    // Navigation Compose
     implementation(libs.androidx.navigation.compose)
-
-    // Room Database (Penyimpanan Lokal)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-
-    // ViewModel & LiveData
     implementation(libs.androidx.lifecycle.viewmodel.compose.v261)
     implementation(libs.androidx.lifecycle.service)
-
-    // Material Icons (Extended)
     implementation(libs.androidx.compose.material.icons.extended)
-
-    // Retrofit
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
     implementation(libs.okhttp.logging)
-
-    implementation(libs.coil.compose.v240)
-
-    // OSMDroid
     implementation(libs.osmdroid)
     implementation(libs.play.services.location)
-    
-    // Permissions
     implementation(libs.google.accompanist.permissions)
-
-    // Vico Charts
     implementation(libs.vico.compose)
     implementation(libs.vico.compose.m3)
     implementation(libs.vico.core)

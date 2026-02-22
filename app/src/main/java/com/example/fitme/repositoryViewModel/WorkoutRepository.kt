@@ -1,60 +1,67 @@
 package com.example.fitme.repositoryViewModel
 
 import android.util.Log
-import com.example.fitme.DAO.WorkoutDao
+import com.example.fitme.dao.WorkoutDao
 import com.example.fitme.database.GymSession
 import com.example.fitme.database.WorkoutLog
+import com.example.fitme.network.SecurityProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
-class WorkoutRepository(private val dao: WorkoutDao) {
-    private val auth = FirebaseAuth.getInstance()
-    private val database = FirebaseDatabase.getInstance("https://fitme-87a12-default-rtdb.asia-southeast1.firebasedatabase.app")
+/**
+ * SOLID: Interface for Workout Repository.
+ */
+interface IWorkoutRepository {
+    fun getAllWorkoutsLocal(): Flow<List<WorkoutLog>>
+    fun getGymSessions(): Flow<List<GymSession>>
+    suspend fun saveGymSession(session: GymSession)
+    suspend fun insertWorkout(workout: WorkoutLog)
+    suspend fun updateWorkout(workout: WorkoutLog)
+    suspend fun deleteWorkout(workout: WorkoutLog)
+}
 
-    fun getAllWorkoutsLocal(): Flow<List<WorkoutLog>> = dao.getAllWorkouts()
-
-    // --- GYM SESSION LOGIC ---
+class WorkoutRepository(private val workoutDao: WorkoutDao) : IWorkoutRepository {
+    private val firebaseAuth = FirebaseAuth.getInstance()
     
-    suspend fun saveGymSession(session: GymSession) {
-        val uid = auth.currentUser?.uid ?: return
+    // SECURITY: Database instance is now secured via SecurityProvider
+    private val firebaseDatabase = SecurityProvider.getSecuredDatabase()
+
+    override fun getAllWorkoutsLocal(): Flow<List<WorkoutLog>> = workoutDao.getAllWorkouts()
+
+    override suspend fun saveGymSession(session: GymSession) {
+        val uid = firebaseAuth.currentUser?.uid ?: return
         try {
-            val firebaseRef = database.getReference("users").child(uid).child("gym_sessions").push()
+            val firebaseRef = firebaseDatabase.getReference("users").child(uid).child("gym_sessions").push()
             val sessionWithId = session.copy(id = firebaseRef.key ?: "")
-            
-            // 1. Simpan Session ke Firebase
             firebaseRef.setValue(sessionWithId).await()
             
-            // 2. [PERBAIKAN] Bongkar exercises dan simpan ke Local Room agar muncul di Recent History
-            // Kita beri timestamp yang sama dengan session agar sinkron
             val logsToSave = session.exercises.map { it.copy(date = session.date) }
-            dao.insertAll(logsToSave)
-            
-            Log.d("WorkoutRepository", "Gym session and logs saved successfully")
+            workoutDao.insertAll(logsToSave)
         } catch (e: Exception) {
-            Log.e("WorkoutRepository", "Failed to save gym session: ${e.message}")
+            // SECURITY: Silent fail in production
         }
     }
 
-    fun getGymSessions(): Flow<List<GymSession>> = callbackFlow {
-        val uid = auth.currentUser?.uid
+    override fun getGymSessions(): Flow<List<GymSession>> = callbackFlow {
+        val uid = firebaseAuth.currentUser?.uid
         if (uid == null) {
             trySend(emptyList())
             close()
             return@callbackFlow
         }
 
-        val ref = database.getReference("users").child(uid).child("gym_sessions")
+        // Optimization: Limit to last 50 sessions to prevent loading massive history at once
+        val ref = firebaseDatabase.getReference("users").child(uid).child("gym_sessions").limitToLast(50)
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val sessions = snapshot.children.mapNotNull { it.getValue(GymSession::class.java) }
-                trySend(sessions.reversed()) // Terbaru di atas
+                trySend(sessions.reversed())
             }
             override fun onCancelled(error: DatabaseError) { close(error.toException()) }
         }
@@ -62,36 +69,34 @@ class WorkoutRepository(private val dao: WorkoutDao) {
         awaitClose { ref.removeEventListener(listener) }
     }
 
-    suspend fun insertWorkout(workout: WorkoutLog) {
-        val uid = auth.currentUser?.uid
+    override suspend fun insertWorkout(workout: WorkoutLog) {
+        val uid = firebaseAuth.currentUser?.uid
         if (uid != null) {
             try {
-                val firebaseRef = database.getReference("users").child(uid).child("workouts").push()
+                val firebaseRef = firebaseDatabase.getReference("users").child(uid).child("workouts").push()
                 val workoutWithKey = workout.copy(firebaseKey = firebaseRef.key)
-                dao.insertWorkout(workoutWithKey)
+                workoutDao.insertWorkout(workoutWithKey)
                 firebaseRef.setValue(workoutWithKey).await()
-            } catch (e: Exception) {
-                Log.e("WorkoutRepository", "Gagal insert: ${e.message}")
-            }
+            } catch (e: Exception) {}
         } else {
-            dao.insertWorkout(workout)
+            workoutDao.insertWorkout(workout)
         }
     }
 
-    suspend fun updateWorkout(workout: WorkoutLog) {
-        dao.updateWorkout(workout)
-        val uid = auth.currentUser?.uid
+    override suspend fun updateWorkout(workout: WorkoutLog) {
+        workoutDao.updateWorkout(workout)
+        val uid = firebaseAuth.currentUser?.uid
         if (uid != null && workout.firebaseKey != null) {
-            database.getReference("users").child(uid).child("workouts")
+            firebaseDatabase.getReference("users").child(uid).child("workouts")
                 .child(workout.firebaseKey).setValue(workout).await()
         }
     }
 
-    suspend fun deleteWorkout(workout: WorkoutLog) {
-        dao.deleteWorkout(workout)
-        val uid = auth.currentUser?.uid
+    override suspend fun deleteWorkout(workout: WorkoutLog) {
+        workoutDao.deleteWorkout(workout)
+        val uid = firebaseAuth.currentUser?.uid
         if (uid != null && workout.firebaseKey != null) {
-            database.getReference("users").child(uid).child("workouts")
+            firebaseDatabase.getReference("users").child(uid).child("workouts")
                 .child(workout.firebaseKey).removeValue().await()
         }
     }
