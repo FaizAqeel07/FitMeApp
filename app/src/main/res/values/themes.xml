@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
+    <!-- Base application theme -->
     <style name="Theme.FitMe" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Splash Screen Theme -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <!-- Background color of the splash screen -->
+        <item name="windowSplashScreenBackground">@color/surface_dark</item>
+        <!-- Icon to be displayed in the center -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo2</item>
+        <!-- The theme to use after the splash screen is gone -->
+        <item name="postSplashScreenTheme">@style/Theme.FitMe</item>
+    </style>
 </resources>

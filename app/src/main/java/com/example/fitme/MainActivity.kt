@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -27,18 +28,30 @@ import com.example.fitme.viewModel.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 1. Install Splash Screen MUST be called before super.onCreate
+        val splashScreen = installSplashScreen()
+        
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
+            val authViewModel: AuthViewModel = viewModel()
+            val isReady by authViewModel.isReady.collectAsState()
+
+            // 2. Keep the splash screen on-screen until Auth state is resolved
+            splashScreen.setKeepOnScreenCondition {
+                !isReady
+            }
+
             FitMeTheme {
-                MainScreen()
+                MainScreen(authViewModel)
             }
         }
     }
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen(authViewModel: AuthViewModel) {
     val context = LocalContext.current
     
     // SOLID: Initialize repositories via interfaces
@@ -55,12 +68,10 @@ fun MainScreen() {
         gymRepository
     )
 
-    val authViewModel: AuthViewModel = viewModel()
+    // Re-use viewModels with the factory
     val workoutViewModel: WorkoutViewModel = viewModel(factory = viewModelFactory)
     val recommendationViewModel: RecommendationViewModel = viewModel(factory = viewModelFactory)
     val runningViewModel: RunningViewModel = viewModel(factory = viewModelFactory)
-    
-    // DashboardViewModel initialized with factory
     val dashboardViewModel: DashboardViewModel = viewModel(factory = viewModelFactory)
 
     val navController = rememberNavController()

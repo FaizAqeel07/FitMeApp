@@ -64,6 +64,10 @@ class AuthViewModel : ViewModel() {
     private val _isSavingProfile = MutableStateFlow(false)
     val isSavingProfile = _isSavingProfile.asStateFlow()
 
+    // Splash Screen State
+    private val _isReady = MutableStateFlow(false)
+    val isReady = _isReady.asStateFlow()
+
     init {
         firebaseAuth.addAuthStateListener { auth ->
             val user = auth.currentUser
@@ -72,6 +76,7 @@ class AuthViewModel : ViewModel() {
                 fetchUserProfile()
             } else {
                 _profileStatus.value = ProfileStatus.IDLE
+                _isReady.value = true // No user session, we are ready to show Login
             }
         }
     }
@@ -82,7 +87,6 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val snapshot = firebaseDatabase.getReference("users").child(uid).child("profile").get().await()
-                // FIX: Explicit typing for Firebase getValue
                 val profile = snapshot.getValue(UserProfile::class.java)
 
                 if (profile != null && profile.weight > 0 && profile.height > 0) {
@@ -96,6 +100,8 @@ class AuthViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e("AuthViewModel", "Error fetching profile", e)
                 _profileStatus.value = ProfileStatus.INCOMPLETE
+            } finally {
+                _isReady.value = true // Data fetching finished (Ready to dismiss splash)
             }
         }
     }
