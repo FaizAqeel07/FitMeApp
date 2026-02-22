@@ -35,7 +35,7 @@ fun DashboardScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToSessionDetail: (String) -> Unit,
     onNavigateToOnboarding: () -> Unit,
-    onNavigateToRunningHistory: () -> Unit = {} // Added for fine-tuning
+    onNavigateToRunningHistory: (String) -> Unit = {} // Added for fine-tuning
 ) {
     val userProfile by authViewModel.userProfile.collectAsState()
     
@@ -112,12 +112,28 @@ fun DashboardScreen(
                         )
                     }
                     is HistoryItem.Run -> {
+                        // --- PRO FIX: DYNAMIC RUN TITLE ---
+                        // Mengambil jam dari timestamp sesi lari
+                        val runCalendar = Calendar.getInstance().apply {
+                            timeInMillis = historyItem.session.startTime
+                        }
+                        val runHour = runCalendar.get(Calendar.HOUR_OF_DAY)
+
+                        // Menentukan judul berdasarkan waktu
+                        val dynamicRunTitle = when (runHour) {
+                            in 5..11 -> "Morning Run"
+                            in 12..14 -> "Noon Run"
+                            in 15..17 -> "Afternoon Run"
+                            in 18..23 -> "Evening Run"
+                            else -> "Night Run" // 00:00 - 04:59
+                        }
+
                         ModernHistoryCard(
                             icon = Icons.AutoMirrored.Filled.DirectionsRun,
-                            title = "Morning Run",
+                            title = dynamicRunTitle, // <--- Gunakan variabel dinamis ini
                             subtitle = "Pace: ${historyItem.session.averagePace}",
                             value = "${String.format(Locale.US, "%.1f", historyItem.session.distanceKm)} km",
-                            onClick = onNavigateToRunningHistory // Fine-tuned: Added click action
+                            onClick = { onNavigateToRunningHistory(historyItem.session.id) }
                         )
                     }
                 }

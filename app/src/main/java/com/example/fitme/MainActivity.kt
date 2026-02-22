@@ -171,8 +171,7 @@ fun MainScreen(authViewModel: AuthViewModel) {
                     onNavigateToDetail = { id -> navController.navigate(Screen.ExerciseDetail.createRoute(id)) },
                     onNavigateToSessionDetail = { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) },
                     onNavigateToOnboarding = { navController.navigate("onboarding") },
-                    onNavigateToRunningHistory = { navController.navigate(Screen.Running.route) }
-                )
+                    onNavigateToRunningHistory = { id -> navController.navigate("run_detail/$id") }      )
             }
 
             composable("onboarding") {
@@ -198,6 +197,10 @@ fun MainScreen(authViewModel: AuthViewModel) {
             composable(Screen.GymSessionDetail.route, arguments = listOf(navArgument("sessionId") { type = NavType.StringType })) { backStackEntry ->
                 val id = backStackEntry.arguments?.getString("sessionId") ?: ""
                 GymSessionDetailScreen(id, workoutViewModel, onBack = { navController.popBackStack() })
+            }
+            composable("run_detail/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.StringType })) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("sessionId") ?: ""
+                RunningSessionDetailScreen(id, runningViewModel, onBack = { navController.popBackStack() })
             }
 
             composable(Screen.Gym.route) {
