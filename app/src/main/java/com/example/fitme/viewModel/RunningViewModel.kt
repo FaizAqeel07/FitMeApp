@@ -23,7 +23,7 @@ class RunningViewModel(private val repository: RunningRepository) : ViewModel() 
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
+            initialValue = emptyOfList()
         )
     
     private val _timeRunFormatted = MutableStateFlow("00:00:00")
@@ -36,13 +36,21 @@ class RunningViewModel(private val repository: RunningRepository) : ViewModel() 
     val caloriesBurned: StateFlow<Int> = _caloriesBurned.asStateFlow()
 
     private var totalTime = 0L
+    private var userWeight = 70.0 // Default weight pro-logic
 
     init {
-        // Ambil data langsung dari Service tiap ada perubahan
         TrackingService.timeRunInMillis.observeForever { millis ->
             totalTime = millis
             updateTimeFormatted(millis)
             updateRealtimeStats(millis, distanceInMeters.value ?: 0)
+        }
+    }
+
+    fun setUserWeight(weight: Double) {
+        if (weight > 0) {
+            userWeight = weight
+            // Recalculate based on current session if tracking
+            updateRealtimeStats(totalTime, distanceInMeters.value ?: 0)
         }
     }
 
@@ -61,11 +69,11 @@ class RunningViewModel(private val repository: RunningRepository) : ViewModel() 
 
     private fun updateRealtimeStats(timeMillis: Long, meters: Int) {
         val distanceKm = meters / 1000.0
-        // Update Pace
         _currentPace.value = calculatePace(timeMillis, distanceKm)
-        // Update Calories (Rumus MET: 8.0 MET untuk lari rata-rata * 70kg)
+        
+        // Dynamic calorie calculation based on user profile weight
         val hours = timeMillis / 1000.0 / 3600.0
-        _caloriesBurned.value = (8.0 * 70 * hours).toInt()
+        _caloriesBurned.value = (8.0 * userWeight * hours).toInt()
     }
 
     fun finishRun() {
@@ -101,4 +109,6 @@ class RunningViewModel(private val repository: RunningRepository) : ViewModel() 
         val seconds = ((pace - minutes) * 60).toInt()
         return "$minutes:${if (seconds < 10) "0" else ""}$seconds"
     }
+
+    private fun <T> emptyOfList(): List<T> = emptyList()
 }

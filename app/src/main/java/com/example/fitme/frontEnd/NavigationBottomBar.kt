@@ -14,10 +14,14 @@ sealed class Screen(val route: String, val title: String = "", val icon: ImageVe
     object Gym : Screen("gym", "Gym", Icons.Default.FitnessCenter)
     object Running : Screen("running", "Run", Icons.AutoMirrored.Filled.DirectionsRun)
     object Profile : Screen("profile", "Profile", Icons.Default.Person)
-    object RecommendationDetail : Screen("recommendation_detail/{recId}") {
-        fun createRoute(recId: String) = "recommendation_detail/$recId"
+    
+    object ExerciseDetail : Screen("exercise_detail/{recId}") {
+        fun createRoute(recId: String) = "exercise_detail/$recId"
     }
+    
     object GymSessionDetail : Screen("gym_session_detail/{sessionId}") {
         fun createRoute(sessionId: String) = "gym_session_detail/$sessionId"
     }
+
+    object StatsDetail : Screen("stats_detail")
 }

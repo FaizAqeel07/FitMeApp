@@ -5,16 +5,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,16 +43,15 @@ fun MainScreen() {
     val database = AppDatabase.getDatabase(context)
     val workoutDao = database.workoutDao()
     val recommendationDao = database.recommendationDao()
-    val gymDao = database.gymDao() // Tambahkan gymDao
+    val gymDao = database.gymDao()
     
     val workoutRepository = WorkoutRepository(workoutDao)
     val recommendationRepository = RecommendationRepository(recommendationDao, workoutDao, context)
     val runningRepository = RunningRepository()
-    val gymRepository = GymRepository(gymDao) // Inisialisasi GymRepository
+    val gymRepository = GymRepository(gymDao)
     
     val authViewModel: AuthViewModel = viewModel()
     
-    // Berikan gymRepository ke Factory
     val viewModelFactory = FitMeViewModelFactory(
         workoutRepository, 
         recommendationRepository, 
@@ -74,17 +66,24 @@ fun MainScreen() {
 
     val navController = rememberNavController()
     val currentUser by authViewModel.currentUser.collectAsState()
+    val userProfile by authViewModel.userProfile.collectAsState()
+
+    // Sync weight for stats
+    LaunchedEffect(userProfile.weight) {
+        if (userProfile.weight > 0) {
+            runningViewModel.setUserWeight(userProfile.weight)
+        }
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    
     val showBottomBar = currentDestination?.route in listOf(
         Screen.Home.route, Screen.Gym.route, Screen.Running.route, Screen.Profile.route
     )
 
     Scaffold(
         bottomBar = {
-            if (showBottomBar) {
+            if (showBottomBar && currentUser != null) {
                 NavigationBar {
                     val items = listOf(Screen.Home, Screen.Gym, Screen.Running, Screen.Profile)
                     items.forEach { screen ->
@@ -94,9 +93,7 @@ fun MainScreen() {
                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                             onClick = {
                                 navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                     launchSingleTop = true
                                     restoreState = true
                                 }
@@ -105,132 +102,81 @@ fun MainScreen() {
                     }
                 }
             }
-        },
-        contentWindowInsets = WindowInsets.navigationBars
+        }
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = if (currentUser != null && currentUser?.isEmailVerified == true) Screen.Home.route else Screen.Login.route,
+            startDestination = if (currentUser == null) Screen.Login.route else Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Login.route) {
                 LoginScreen(
-                    onLoginSuccess = {
+                    onLoginSuccess = { 
                         authViewModel.updateCurrentUser()
-                        navController.navigate(Screen.Home.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
-                        }
+                        navController.navigate(Screen.Home.route) { popUpTo(Screen.Login.route) { inclusive = true } }
                     },
                     onNavigateToRegister = { navController.navigate(Screen.Register.route) },
                     onGoogleLogin = {
                         authViewModel.loginWithGoogle(context, 
-                            onSuccess = {
-                                navController.navigate(Screen.Home.route) {
-                                    popUpTo(Screen.Login.route) { inclusive = true }
-                                }
-                            },
-                            onError = { error ->
-                                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-                            }
+                            onError = { error -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show() }
                         )
+                        // AuthStateListener di ViewModel akan otomatis mendeteksi login
+                        // Kita beri delay kecil untuk memastikan UI menangkap perubahan currentUser
                     }
                 )
             }
+
             composable(Screen.Register.route) {
                 RegisterScreen(
-                    onRegisterSuccess = {
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(Screen.Register.route) { inclusive = true }
-                        }
-                    },
+                    onRegisterSuccess = { navController.navigate(Screen.Login.route) },
                     onNavigateToLogin = { navController.popBackStack() }
                 )
             }
+
             composable(Screen.Home.route) { 
-                DashboardScreen(
-                    viewModel = viewModel,
-                    recViewModel = recViewModel,
-                    runningViewModel = runningViewModel,
-                    onNavigateToDetail = { recId ->
-                        navController.navigate(Screen.RecommendationDetail.createRoute(recId))
-                    },
-                    onNavigateToAddGym = {
-                        navController.navigate("add_gym_session")
-                    },
-                    onNavigateToSessionDetail = { sessionId ->
-                        navController.navigate(Screen.GymSessionDetail.createRoute(sessionId))
-                    }
+                DashboardScreen(authViewModel, viewModel, recViewModel, runningViewModel,
+                    onNavigateToDetail = { id -> navController.navigate(Screen.ExerciseDetail.createRoute(id)) },
+                    onNavigateToAddGym = { navController.navigate("add_gym_session") },
+                    onNavigateToSessionDetail = { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) },
+                    onNavigateToOnboarding = { navController.navigate("onboarding") }
                 ) 
             }
-            
-            composable("add_gym_session") {
-                AddGymSessionScreen(
-                    viewModel = viewModel,
-                    recViewModel = recViewModel,
-                    onNavigateToDetail = { recId ->
-                        navController.navigate(Screen.RecommendationDetail.createRoute(recId))
-                    },
-                    onBack = { navController.popBackStack() }
-                )
+
+            composable("onboarding") {
+                OnboardingScreen(authViewModel, onComplete = { navController.popBackStack() })
             }
-            
-            composable(
-                route = Screen.RecommendationDetail.route,
-                arguments = listOf(navArgument("recId") { type = NavType.StringType })
-            ) { backStackEntry ->
+
+            composable(Screen.ExerciseDetail.route, arguments = listOf(navArgument("recId") { type = NavType.StringType })) { backStackEntry ->
                 val recId = backStackEntry.arguments?.getString("recId") ?: ""
                 val recommendation by recViewModel.selectedRecommendation.collectAsState()
-                
-                LaunchedEffect(recId) {
-                    recViewModel.getRecommendationById(recId)
-                }
-
-                recommendation?.let { data ->
-                    RecommendationDetailScreen(
-                        recommendation = data,
-                        onBack = { navController.popBackStack() }
-                    )
-                } ?: Box(modifier = Modifier.fillMaxSize()) {
-                    CircularProgressIndicator(modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
-                }
+                LaunchedEffect(recId) { recViewModel.getRecommendationById(recId) }
+                recommendation?.let { ExerciseDetailScreen(it, viewModel, onBack = { navController.popBackStack() }) }
             }
 
-            composable(
-                route = Screen.GymSessionDetail.route,
-                arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
-            ) { backStackEntry ->
-                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
-                GymSessionDetailScreen(
-                    sessionId = sessionId,
-                    viewModel = viewModel,
-                    onBack = { navController.popBackStack() }
-                )
+            composable(Screen.GymSessionDetail.route, arguments = listOf(navArgument("sessionId") { type = NavType.StringType })) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("sessionId") ?: ""
+                GymSessionDetailScreen(id, viewModel, onBack = { navController.popBackStack() })
             }
 
             composable(Screen.Gym.route) { 
-                GymScreen(
-                    viewModel = viewModel,
-                    onNavigateToAddSession = {
-                        navController.navigate("add_gym_session")
-                    },
-                    onNavigateToSessionDetail = { sessionId ->
-                        navController.navigate(Screen.GymSessionDetail.createRoute(sessionId))
-                    }
+                GymScreen(viewModel, 
+                    onNavigateToAddSession = { navController.navigate("add_gym_session") },
+                    onNavigateToSessionDetail = { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) }
                 ) 
             }
 
-            composable(Screen.Running.route) { 
-                RunningScreen(runningViewModel) 
-            }
+            composable(Screen.Running.route) { RunningScreen(runningViewModel) }
+            composable(Screen.StatsDetail.route) { StatsDetailScreen(viewModel, runningViewModel, onBack = { navController.popBackStack() }) }
+            composable("account_settings") { AccountSettingsScreen(authViewModel, onBack = { navController.popBackStack() }) }
             composable(Screen.Profile.route) { 
-                ProfileScreen(
+                ProfileScreen(authViewModel, viewModel, runningViewModel,
+                    onNavigateToStats = { navController.navigate(Screen.StatsDetail.route) },
+                    onNavigateToAccountSettings = { navController.navigate("account_settings") },
                     onLogout = {
                         authViewModel.signOut()
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
+                        navController.navigate(Screen.Login.route) { popUpTo(0) { inclusive = true } }
                     }
-                ) 
+                )
             }
         }
     }

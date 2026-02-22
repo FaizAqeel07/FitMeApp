@@ -140,6 +140,22 @@ class FitMeViewModel(
         }
     }
 
+    fun logSingleWorkout(exerciseName: String, weight: Double, reps: Int, sets: Int, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val volume = weight * reps * sets
+            val workout = WorkoutLog(
+                exerciseName = exerciseName,
+                weight = weight,
+                reps = reps,
+                sets = sets,
+                volume = volume,
+                date = System.currentTimeMillis()
+            )
+            repository.insertWorkout(workout)
+            onSuccess()
+        }
+    }
+
     fun clearSearch() { 
         _searchQuery.value = ""
         _searchResults.value = emptyList() 

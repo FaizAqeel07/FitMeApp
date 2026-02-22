@@ -30,6 +30,7 @@ import com.example.fitme.database.GymSession
 import com.example.fitme.database.Recommendation
 import com.example.fitme.database.RunningSession
 import com.example.fitme.database.WorkoutLog
+import com.example.fitme.viewModel.AuthViewModel
 import com.example.fitme.viewModel.FitMeViewModel
 import com.example.fitme.viewModel.RecommendationViewModel
 import com.example.fitme.viewModel.RunningViewModel
@@ -39,13 +40,16 @@ import java.util.concurrent.TimeUnit
 
 @Composable
 fun DashboardScreen(
+    authViewModel: AuthViewModel,
     viewModel: FitMeViewModel,
     recViewModel: RecommendationViewModel,
     runningViewModel: RunningViewModel,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToAddGym: () -> Unit,
-    onNavigateToSessionDetail: (String) -> Unit // TAMBAHKAN INI
+    onNavigateToSessionDetail: (String) -> Unit,
+    onNavigateToOnboarding: () -> Unit
 ) {
+    val userProfile by authViewModel.userProfile.collectAsState()
     val logs by viewModel.allWorkouts.collectAsState()
     val gymSessions by viewModel.gymSessions.collectAsState()
     val recommendations by recViewModel.recommendedExercises.collectAsState()
@@ -93,8 +97,7 @@ fun DashboardScreen(
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Session")
             }
-        },
-        containerColor = Color.Transparent
+        }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -103,8 +106,40 @@ fun DashboardScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item { Spacer(modifier = Modifier.height(24.dp)) }
+
+            // --- PRO BANNER: PROFILE REMINDER ---
+            if (userProfile.weight <= 0 || userProfile.height <= 0) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Profile Incomplete", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                                Text("Set your weight and height for accurate tracking.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f))
+                            }
+                            Button(
+                                onClick = onNavigateToOnboarding,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Fix Now", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
             item {
-                Spacer(modifier = Modifier.height(48.dp))
                 Text(
                     text = greeting,
                     style = MaterialTheme.typography.headlineMedium,
@@ -176,7 +211,6 @@ fun DashboardScreen(
                 Text("Recent History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
-            // Combined history using GymSession instead of individual logs
             val combinedHistory = (gymSessions.map { "gym" to it } + runningHistory.map { "run" to it })
                 .sortedByDescending { 
                     if (it.second is GymSession) (it.second as GymSession).date 
@@ -279,27 +313,6 @@ fun RunningHistoryCard(session: RunningSession) {
                 Text("$dateStr • Pace: ${session.averagePace}", style = MaterialTheme.typography.bodySmall)
             }
             Text("${session.caloriesBurned} Kcal", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color(0xFFE57373))
-        }
-    }
-}
-
-@Composable
-fun GymHistoryCard(log: WorkoutLog) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-    ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) { Icon(Icons.Default.FitnessCenter, null, tint = MaterialTheme.colorScheme.secondary) }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(log.exerciseName, fontWeight = FontWeight.Bold)
-                Text("${log.sets} sets x ${log.reps} reps", style = MaterialTheme.typography.bodySmall)
-            }
         }
     }
 }
