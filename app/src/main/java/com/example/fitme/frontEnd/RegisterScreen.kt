@@ -43,7 +43,6 @@ fun RegisterScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Aesthetic Background Gradient
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -158,6 +157,10 @@ fun RegisterScreen(
                                                 isLoading = false
                                                 if (verifyTask.isSuccessful) {
                                                     Toast.makeText(context, "Verification email sent!", Toast.LENGTH_LONG).show()
+
+                                                    // PRO FIX: Paksa logout biar cache "belum verif" bersih!
+                                                    auth.signOut()
+
                                                     onRegisterSuccess()
                                                 }
                                             }

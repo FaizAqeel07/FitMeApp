@@ -30,38 +30,25 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
-        
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
             val authViewModel: AuthViewModel = viewModel()
             val isReady by authViewModel.isReady.collectAsState()
-            
-            // Tambahkan state tambahan untuk animasi loading di Compose
             var showLoadingScreen by remember { mutableStateOf(true) }
 
-            // Splash Screen Sistem akan hilang saat isReady = true
-            splashScreen.setKeepOnScreenCondition {
-                !isReady
-            }
+            splashScreen.setKeepOnScreenCondition { !isReady }
 
-            // Setelah isReady true, kita beri delay sedikit agar Loading Screen Compose terlihat
             LaunchedEffect(isReady) {
                 if (isReady) {
-                    delay(1500) // Delay 1.5 detik agar animasi loading terlihat smooth
+                    delay(1500)
                     showLoadingScreen = false
                 }
             }
 
             FitMeTheme {
-                if (showLoadingScreen) {
-                    // Layar Loading dengan Spinner Neon
-                    SplashScreenLoading()
-                } else {
-                    // Aplikasi Utama
-                    MainScreen(authViewModel)
-                }
+                if (showLoadingScreen) SplashScreenLoading() else MainScreen(authViewModel)
             }
         }
     }
@@ -70,21 +57,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(authViewModel: AuthViewModel) {
     val context = LocalContext.current
-    
-    // SOLID: Initialize repositories via interfaces
     val database = AppDatabase.getDatabase(context)
+
     val workoutRepository = WorkoutRepository(database.workoutDao())
     val recommendationRepository = RecommendationRepository(database.recommendationDao(), database.workoutDao(), context)
     val runningRepository = RunningRepository()
     val gymRepository = GymRepository(database.gymDao())
 
-    val viewModelFactory = FitMeViewModelFactory(
-        workoutRepository,
-        recommendationRepository,
-        runningRepository,
-        gymRepository
-    )
-
+    val viewModelFactory = FitMeViewModelFactory(workoutRepository, recommendationRepository, runningRepository, gymRepository)
     val workoutViewModel: WorkoutViewModel = viewModel(factory = viewModelFactory)
     val recommendationViewModel: RecommendationViewModel = viewModel(factory = viewModelFactory)
     val runningViewModel: RunningViewModel = viewModel(factory = viewModelFactory)
@@ -95,9 +75,7 @@ fun MainScreen(authViewModel: AuthViewModel) {
     val userProfile by authViewModel.userProfile.collectAsState()
 
     LaunchedEffect(userProfile.weight) {
-        if (userProfile.weight > 0) {
-            runningViewModel.setUserWeight(userProfile.weight)
-        }
+        if (userProfile.weight > 0) runningViewModel.setUserWeight(userProfile.weight)
     }
 
     LaunchedEffect(currentUser) {
@@ -111,18 +89,15 @@ fun MainScreen(authViewModel: AuthViewModel) {
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val showBottomBar = currentDestination?.route in listOf(
-        Screen.Home.route, Screen.Gym.route, Screen.Running.route, Screen.Profile.route
-    )
+    val showBottomBar = currentDestination?.route in listOf(Screen.Home.route, Screen.Gym.route, Screen.Running.route, Screen.Profile.route)
 
     Scaffold(
         bottomBar = {
             if (showBottomBar && currentUser != null) {
                 NavigationBar {
-                    val items = listOf(Screen.Home, Screen.Gym, Screen.Running, Screen.Profile)
-                    items.forEach { screen ->
+                    listOf(Screen.Home, Screen.Gym, Screen.Running, Screen.Profile).forEach { screen ->
                         NavigationBarItem(
-                            icon = { screen.icon?.let { Icon(it, contentDescription = null) } },
+                            icon = { screen.icon?.let { Icon(it, null) } },
                             label = { Text(screen.title) },
                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                             onClick = {
@@ -150,82 +125,76 @@ fun MainScreen(authViewModel: AuthViewModel) {
                         navController.navigate(Screen.Home.route) { popUpTo(Screen.Login.route) { inclusive = true } }
                     },
                     onNavigateToRegister = { navController.navigate(Screen.Register.route) },
-                    onGoogleLogin = { idToken -> // Terima idToken dari UI
-                        authViewModel.signInWithGoogleToken(idToken, onError = { error ->
-                            Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-                        })
+
+                    // PRO FIX: Gunakan token dari LoginScreen untuk sign in via ViewModel
+                    onGoogleLogin = { token ->
+                        authViewModel.signInWithGoogleToken(
+                            idToken = token,
+                            onSuccess = { /* Navigation handled by LaunchedEffect */ },
+                            onError = { error -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show() }
+                        )
                     }
                 )
             }
+
             composable(Screen.Register.route) {
                 RegisterScreen(
-                    onRegisterSuccess = { navController.navigate(Screen.Login.route) },
+                    onRegisterSuccess = { navController.popBackStack() },
                     onNavigateToLogin = { navController.popBackStack() }
                 )
             }
 
             composable(Screen.Home.route) {
-                DashboardScreen(
-                    authViewModel = authViewModel, 
-                    dashboardViewModel = dashboardViewModel,
-                    onNavigateToDetail = { id -> navController.navigate(Screen.ExerciseDetail.createRoute(id)) },
-                    onNavigateToSessionDetail = { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) },
-                    onNavigateToOnboarding = { navController.navigate("onboarding") },
-                    onNavigateToRunningHistory = { id -> navController.navigate("run_detail/$id") }      )
-            }
-
-            composable("onboarding") {
-                OnboardingScreen(authViewModel, onComplete = { navController.popBackStack() })
-            }
-
-            composable("add_gym_session") {
-                AddGymSessionScreen(
-                    viewModel = workoutViewModel,
-                    recViewModel = recommendationViewModel,
-                    onNavigateToDetail = { id -> navController.navigate(Screen.ExerciseDetail.createRoute(id)) },
-                    onBack = { navController.popBackStack() }
+                DashboardScreen(authViewModel, dashboardViewModel,
+                    { id -> navController.navigate(Screen.ExerciseDetail.createRoute(id)) },
+                    { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) },
+                    { navController.navigate("onboarding") },
+                    { id -> navController.navigate("run_detail/$id") }
                 )
             }
 
-            composable(Screen.ExerciseDetail.route, arguments = listOf(navArgument("recId") { type = NavType.StringType })) { backStackEntry ->
-                val recId = backStackEntry.arguments?.getString("recId") ?: ""
-                val recommendation by recommendationViewModel.selectedRecommendation.collectAsState()
-                LaunchedEffect(recId) { recommendationViewModel.getRecommendationById(recId) }
-                recommendation?.let { ExerciseDetailScreen(it, workoutViewModel, onBack = { navController.popBackStack() }) }
+            composable("onboarding") { OnboardingScreen(authViewModel, onComplete = { navController.popBackStack() }) }
+
+            composable("add_gym_session") {
+                AddGymSessionScreen(workoutViewModel, recommendationViewModel,
+                    { id -> navController.navigate(Screen.ExerciseDetail.createRoute(id)) },
+                    { navController.popBackStack() }
+                )
             }
 
-            composable(Screen.GymSessionDetail.route, arguments = listOf(navArgument("sessionId") { type = NavType.StringType })) { backStackEntry ->
-                val id = backStackEntry.arguments?.getString("sessionId") ?: ""
-                GymSessionDetailScreen(id, workoutViewModel, onBack = { navController.popBackStack() })
+            composable(Screen.ExerciseDetail.route, arguments = listOf(navArgument("recId") { type = NavType.StringType })) {
+                val recId = it.arguments?.getString("recId") ?: ""
+                LaunchedEffect(recId) { recommendationViewModel.getRecommendationById(recId) }
+                val recommendation by recommendationViewModel.selectedRecommendation.collectAsState()
+                recommendation?.let { r -> ExerciseDetailScreen(r, workoutViewModel, { navController.popBackStack() }) }
             }
-            composable("run_detail/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.StringType })) { backStackEntry ->
-                val id = backStackEntry.arguments?.getString("sessionId") ?: ""
-                RunningSessionDetailScreen(id, runningViewModel, onBack = { navController.popBackStack() })
+
+            composable(Screen.GymSessionDetail.route, arguments = listOf(navArgument("sessionId") { type = NavType.StringType })) {
+                val id = it.arguments?.getString("sessionId") ?: ""
+                GymSessionDetailScreen(id, workoutViewModel, { navController.popBackStack() })
+            }
+
+            composable("run_detail/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.StringType })) {
+                val id = it.arguments?.getString("sessionId") ?: ""
+                RunningSessionDetailScreen(id, runningViewModel, { navController.popBackStack() })
             }
 
             composable(Screen.Gym.route) {
-                GymScreen(
-                    viewModel = workoutViewModel,
-                    onNavigateToAddSession = { navController.navigate("add_gym_session") },
-                    onNavigateToSessionDetail = { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) }
+                GymScreen(workoutViewModel,
+                    { navController.navigate("add_gym_session") },
+                    { id -> navController.navigate(Screen.GymSessionDetail.createRoute(id)) }
                 )
             }
 
             composable(Screen.Running.route) { RunningScreen(runningViewModel) }
-            composable(Screen.StatsDetail.route) { StatsDetailScreen(workoutViewModel, runningViewModel, onBack = { navController.popBackStack() }) }
-            composable("account_settings") { AccountSettingsScreen(authViewModel, onBack = { navController.popBackStack() }) }
+            composable(Screen.StatsDetail.route) { StatsDetailScreen(workoutViewModel, runningViewModel, { navController.popBackStack() }) }
+            composable("account_settings") { AccountSettingsScreen(authViewModel, { navController.popBackStack() }) }
+
             composable(Screen.Profile.route) {
-                ProfileScreen(
-                    authViewModel = authViewModel, 
-                    viewModel = workoutViewModel,
-                    runningViewModel = runningViewModel,
-                    onNavigateToStats = { navController.navigate(Screen.StatsDetail.route) },
-                    onNavigateToAccountSettings = { navController.navigate("account_settings") },
-                    onLogout = {
-                        authViewModel.signOutWithSync(context) {
-                            navController.navigate(Screen.Login.route) { popUpTo(0) { inclusive = true } }
-                        }
-                    }
+                ProfileScreen(authViewModel, workoutViewModel, runningViewModel,
+                    { navController.navigate(Screen.StatsDetail.route) },
+                    { navController.navigate("account_settings") },
+                    { authViewModel.signOutWithSync(context) { navController.navigate(Screen.Login.route) { popUpTo(0) { inclusive = true } } } }
                 )
             }
         }

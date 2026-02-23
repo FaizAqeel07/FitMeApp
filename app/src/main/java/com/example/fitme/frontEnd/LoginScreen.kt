@@ -32,20 +32,17 @@ import com.google.firebase.auth.FirebaseAuth
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
-    onGoogleLogin: (String) -> Unit // Lempar ID Token ke MainActivity -> ViewModel
+    onGoogleLogin: (String) -> Unit // Minta String (Token), bukan Unit kosong
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    var isGoogleLoading by remember { mutableStateOf(false) }
 
     val auth = FirebaseAuth.getInstance()
     val context = LocalContext.current
 
-    // --- PRO FIX: PENGGANTI CREDENTIAL MANAGER YANG NGE-BUG ---
+    // --- GOOGLE SIGN IN CLIENT SETUP ---
     val webClientId = "621078401507-h0h0bpcq125hbn4asqr89098d6f8tbpn.apps.googleusercontent.com"
-
-    // Siapkan konfigurasi API Klasik
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(webClientId)
@@ -54,27 +51,22 @@ fun LoginScreen(
     }
     val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
 
-    // Launcher untuk menangkap hasil klik akun Google
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        isGoogleLoading = false // Matikan loading
         if (result.resultCode == Activity.RESULT_OK) {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
                 val account = task.getResult(ApiException::class.java)
                 val idToken = account?.idToken
                 if (idToken != null) {
-                    onGoogleLogin(idToken) // Lempar token sukses!
+                    onGoogleLogin(idToken) // Lempar token ke MainActivity
                 } else {
                     Toast.makeText(context, "Google Token Kosong", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: ApiException) {
-                Log.e("LoginScreen", "Google sign in failed: ${e.statusCode}", e)
-                Toast.makeText(context, "Login gagal: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Login Gagal: ${e.statusCode}", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            Log.e("LoginScreen", "User membatalkan popup login.")
         }
     }
 
@@ -83,7 +75,6 @@ fun LoginScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Aesthetic Background Blur Effect
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -99,24 +90,27 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Surface(modifier = Modifier.size(80.dp), shape = RoundedCornerShape(20.dp), color = PrimaryNeon) {
+            Surface(
+                modifier = Modifier.size(80.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = PrimaryNeon
+            ) {
                 Box(contentAlignment = Alignment.Center) { Text("F", color = Color.Black, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold) }
             }
+
             Spacer(modifier = Modifier.height(24.dp))
             Text("Welcome Back", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
             Text("Push your limits today.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(48.dp))
 
             OutlinedTextField(
-                value = email, onValueChange = { email = it },
-                label = { Text("Email Address") },
+                value = email, onValueChange = { email = it }, label = { Text("Email Address") },
                 leadingIcon = { Icon(Icons.Default.Email, null, tint = PrimaryNeon) },
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
-                value = password, onValueChange = { password = it },
-                label = { Text("Password") },
+                value = password, onValueChange = { password = it }, label = { Text("Password") },
                 leadingIcon = { Icon(Icons.Default.Lock, null, tint = PrimaryNeon) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true
@@ -125,24 +119,41 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { /* (Fungsi Email Lama) */ },
+                onClick = {
+                    if (email.isNotEmpty() && password.isNotEmpty()) {
+                        isLoading = true
+                        auth.signInWithEmailAndPassword(email, password)
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    // FORCE RELOAD STATUS VERIFIKASI
+                                    auth.currentUser?.reload()?.addOnCompleteListener {
+                                        isLoading = false
+                                        if (auth.currentUser?.isEmailVerified == true) {
+                                            onLoginSuccess()
+                                        } else {
+                                            Toast.makeText(context, "Verify your email!", Toast.LENGTH_SHORT).show()
+                                            auth.signOut()
+                                        }
+                                    }
+                                } else {
+                                    isLoading = false
+                                    Toast.makeText(context, task.exception?.message, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryNeon, contentColor = Color.Black)
-            ) { Text("SIGN IN", fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp) }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant)
-                Text(" OR ", modifier = Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.Black)
+                else Text("SIGN IN", fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
             }
-            Spacer(modifier = Modifier.height(24.dp))
 
+            Spacer(modifier = Modifier.height(24.dp))
             OutlinedButton(
                 onClick = {
-                    isGoogleLoading = true
-                    // Trik Pro: Sign out paksa dari cache dulu biar selalu munculin pilihan akun
+                    // Signout dulu biar selalu muncul pilihan akun
                     googleSignInClient.signOut().addOnCompleteListener {
                         launcher.launch(googleSignInClient.signInIntent)
                     }
@@ -150,11 +161,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                if (isGoogleLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onBackground)
-                } else {
-                    Text("CONTINUE WITH GOOGLE", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                }
+                Text("CONTINUE WITH GOOGLE", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
             }
 
             Spacer(modifier = Modifier.weight(1f))
