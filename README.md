@@ -1,7 +1,7 @@
 # FitMe - Smart Fitness & Running Tracker 💪🏃‍♂️
 
 <div align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_splash_logo.webp" alt="FitMe Logo" width="150"/>
+  <img src="D:\GDGoC\Android\FitMe\app\src\main\res\mipmap-xxhdpi\ic_launcher.webp" alt="FitMe Logo" width="150"/>
   <br/>
   <h3>Centralized, Cloud-Synced, All-in-One Fitness Tracker</h3>
 </div>
