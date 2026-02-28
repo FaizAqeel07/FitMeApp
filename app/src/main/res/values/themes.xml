@@ -8,7 +8,7 @@
         <!-- Background color of the splash screen -->
         <item name="windowSplashScreenBackground">@color/surface_dark</item>
         <!-- Icon to be displayed in the center -->
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo2</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
         <!-- The theme to use after the splash screen is gone -->
         <item name="postSplashScreenTheme">@style/Theme.FitMe</item>
     </style>
