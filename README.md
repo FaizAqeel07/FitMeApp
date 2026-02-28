@@ -1,7 +1,7 @@
 # FitMe - Smart Fitness & Running Tracker 💪🏃‍♂️
 
 <div align="center">
-  <img src="https://github.com/FaizAqeel07/FitMeApp/blob/3289320c3aaeb7fdc337d4d3871e00d83f05a5eb/app/src/main/res/drawable/ic_splash_logo.png" alt="FitMe Logo" width="150"/>
+  <img src="https://github.com/FaizAqeel07/FitMeApp/blob/3289320c3aaeb7fdc337d4d3871e00d83f05a5eb/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" alt="FitMe Logo" width="150"/>
   <br/>
   <h3>Centralized, Cloud-Synced, All-in-One Fitness Tracker</h3>
 </div>
