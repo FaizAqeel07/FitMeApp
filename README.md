@@ -42,7 +42,7 @@ This application is built with Clean Architecture and Modern Android Development
 ### Installation
 1. Clone this repository:
    ```bash
-   git clone [https://github.com/faizaqeel07/fitmeapp.git](https://github.com/faizaqeel07/fitmeapp.git)
+   git clone [https://github.com/QelIz/FitMeApp.git](https://github.com/QelIz/FitMeApp.git)
 2. Open the project in Android Studio.
 3. Connect the project to your Firebase Console (Add google-services.json to the app/ directory if you are setting up your own Firebase environment).
 4. Sync the project with Gradle files.
